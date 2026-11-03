@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель директора / Директор панели</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #3498db;
+            --bg-color: #f4f6f9;
+            --card-bg: #ffffff;
+            --text-color: #333;
+            --border-radius: 8px;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 15px;
+        }
+        .container { max-width: 1100px; margin: 0 auto; }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--primary-color);
+            color: white;
+            padding: 15px 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+        }
+        .lang-switch button {
+            background: var(--accent-color);
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        select, button, input[type="date"] {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .btn-refresh {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .status { font-size: 13px; color: #27ae60; font-weight: 600; }
+        .status.offline { color: #c0392b; }
+        .table-responsive { overflow-x: auto; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            font-size: 13px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .total-row {
+            font-weight: bold;
+            background-color: #e8f4f8 !important;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h2 id="app-title">Панель директора: Отчет посещаемости</h2>
+        <div class="lang-switch">
+            <button onclick="switchLang('ru')">РУС</button>
+            <button onclick="switchLang('kg')">КЫР</button>
+        </div>
+    </header>
+
+    <div class="card">
+        <div class="controls">
+            <div>
+                <label id="lbl-date-filter" style="font-weight:600; font-size:14px;">Дата:</label>
+                <input type="date" id="filter-date" onchange="renderTable()">
+            </div>
+            <div>
+                <label id="lbl-shift-filter" style="font-weight:600; font-size:14px;">Смена:</label>
+                <select id="filter-shift" onchange="renderTable()">
+                    <option value="1">1-смена</option>
+                    <option value="2">2-смена</option>
+                </select>
+            </div>
+            <button class="btn-refresh" onclick="renderTable()" id="btn-refresh">Обновить данные</button>
+            <span class="status" id="status">●</span>
+        </div>
+
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>№</th>
+                        <th id="th-class">Классы</th>
+                        <th id="th-total">Общ кол-во уч</th>
+                        <th id="th-l1">1-урок</th>
+                        <th id="th-l2">2-урок</th>
+                        <th id="th-late">Кол-во опазд. уч</th>
+                        <th id="th-late-p">Опазд. уч в %</th>
+                        <th id="th-l6">6-урок</th>
+                        <th id="th-escaped">Кол-во сбежав. уч</th>
+                        <th id="th-rate">Посещаемость %</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body"></tbody>
+                <tfoot>
+                    <tr class="total-row" id="table-total"></tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        projectId: "qr-code-hujamov"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const translations = {
+        ru: {
+            appTitle: "Панель директора: Отчет посещаемости",
+            lblDateFilter: "Дата:",
+            lblShiftFilter: "Смена:",
+            btnRefresh: "Обновить данные",
+            thClass: "Классы",
+            thTotal: "Общ кол-во уч",
+            thL1: "1-урок",
+            thL2: "2-урок",
+            thLate: "Кол-во опазд. уч",
+            thLateP: "Опазд. уч в %",
+            thL6: "6-урок",
+            thEscaped: "Кол-во сбежав. уч",
+            thRate: "Посещаемость %",
+            totalText: "Итого",
+            online: "● Онлайн (данные обновляются сами)",
+            offline: "● Нет связи с базой"
+        },
+        kg: {
+            appTitle: "Директор панели: Катышуу отчёту",
+            lblDateFilter: "Күнү:",
+            lblShiftFilter: "Нөөмөт:",
+            btnRefresh: "Жаңыртуу",
+            thClass: "Класстар",
+            thTotal: "Жалпы окуучу",
+            thL1: "1-сабак",
+            thL2: "2-сабак",
+            thLate: "Кечиккендер",
+            thLateP: "Кечигүү %",
+            thL6: "6-сабак",
+            thEscaped: "Качып кеткендер",
+            thRate: "Катышуу %",
+            totalText: "Жыйынтык",
+            online: "● Онлайн (маалымат өзү жаңырат)",
+            offline: "● Базага байланыш жок"
+        }
+    };
+
+    let currentLang = 'ru';
+
+    function todayStr() {
+        const d = new Date();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${d.getFullYear()}-${m}-${day}`;
+    }
+
+    document.getElementById('filter-date').value = todayStr();
+
+    window.switchLang = function(lang) {
+        currentLang = lang;
+        const t = translations[lang];
+        document.getElementById('app-title').innerText = t.appTitle;
+        document.getElementById('lbl-date-filter').innerText = t.lblDateFilter;
+        document.getElementById('lbl-shift-filter').innerText = t.lblShiftFilter;
+        document.getElementById('btn-refresh').innerText = t.btnRefresh;
+        document.getElementById('th-class').innerText = t.thClass;
+        document.getElementById('th-total').innerText = t.thTotal;
+        document.getElementById('th-l1').innerText = t.thL1;
+        document.getElementById('th-l2').innerText = t.thL2;
+        document.getElementById('th-late').innerText = t.thLate;
+        document.getElementById('th-late-p').innerText = t.thLateP;
+        document.getElementById('th-l6').innerText = t.thL6;
+        document.getElementById('th-escaped').innerText = t.thEscaped;
+        document.getElementById('th-rate').innerText = t.thRate;
+        setStatus(statusOnline);
+        renderTable();
+    };
+
+    let globalData = [];
+    let statusOnline = true;
+
+    function setStatus(online) {
+        statusOnline = online;
+        const el = document.getElementById('status');
+        el.innerText = translations[currentLang][online ? 'online' : 'offline'];
+        el.className = 'status' + (online ? '' : ' offline');
+    }
+
+    // Real-time: istalgan qurilmadan yozilgan o'zgarish shu zahoti keladi
+    onSnapshot(collection(db, "attendance"), (snapshot) => {
+        globalData = [];
+        snapshot.forEach((d) => globalData.push(d.data()));
+        setStatus(true);
+        renderTable();
+    }, (error) => {
+        console.error("Firestore xatolik:", error);
+        setStatus(false);
+    });
+
+    function esc(s) {
+        return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    window.renderTable = function() {
+        const shift = document.getElementById('filter-shift').value;
+        const date = document.getElementById('filter-date').value || todayStr();
+        const tbody = document.getElementById('table-body');
+        const tfoot = document.getElementById('table-total');
+        tbody.innerHTML = '';
+
+        const filteredData = globalData
+            .filter(item => item.shift === shift && item.date === date)
+            .sort((a, b) => String(a.className).localeCompare(String(b.className), undefined, { numeric: true }));
+
+        let sumTotal = 0, sumL1 = 0, sumL2 = 0, sumLate = 0, sumL6 = 0, sumEscaped = 0;
+        let index = 1;
+
+        filteredData.forEach(item => {
+            const total = item.total || 0;
+            const l1 = item.l1 || 0;
+            const l2 = item.l2 || 0;
+            const l6 = item.l6 || 0;
+
+            const late = Math.max(0, l2 - l1);
+            const latePercent = total > 0 ? Math.round((late / total) * 100) : 0;
+            const escaped = Math.max(0, l2 - l6);
+            const rate = total > 0 ? Math.round((l2 / total) * 100) : 0;
+
+            sumTotal += total;
+            sumL1 += l1;
+            sumL2 += l2;
+            sumLate += late;
+            sumL6 += l6;
+            sumEscaped += escaped;
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${index++}</td>
+                <td><strong>${esc(item.className)}</strong></td>
+                <td>${total}</td>
+                <td>${l1}</td>
+                <td>${l2}</td>
+                <td>${late}</td>
+                <td>${latePercent}%</td>
+                <td>${l6}</td>
+                <td>${escaped}</td>
+                <td><strong>${rate}%</strong></td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        const totalLatePercent = sumTotal > 0 ? Math.round((sumLate / sumTotal) * 100) : 0;
+        const totalRatePercent = sumTotal > 0 ? Math.round((sumL2 / sumTotal) * 100) : 0;
+        const tText = translations[currentLang].totalText;
+
+        tfoot.innerHTML = `
+            <td colspan="2">${tText}:</td>
+            <td>${sumTotal}</td>
+            <td>${sumL1}</td>
+            <td>${sumL2}</td>
+            <td>${sumLate}</td>
+            <td>${totalLatePercent}%</td>
+            <td>${sumL6}</td>
+            <td>${sumEscaped}</td>
+            <td>${totalRatePercent}%</td>
+        `;
+    };
+
+    switchLang('ru');
+</script>
+
+</body>
+</html>

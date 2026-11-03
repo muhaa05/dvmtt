@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель учителя / Мугалим панели</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #3498db;
+            --bg-color: #f4f6f9;
+            --card-bg: #ffffff;
+            --text-color: #333;
+            --border-radius: 8px;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 15px;
+        }
+        .container { max-width: 600px; margin: 0 auto; }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--primary-color);
+            color: white;
+            padding: 15px 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+        }
+        .lang-switch button {
+            background: var(--accent-color);
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .btn-submit {
+            width: 100%;
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-submit:hover { background: #219150; }
+        .btn-submit:disabled { background: #95a5a6; cursor: wait; }
+        .info-note { font-size: 13px; color: #666; margin-top: 5px; }
+        .live-box {
+            background: #e8f4f8;
+            border-radius: 4px;
+            padding: 10px 12px;
+            font-size: 14px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .date-line { font-size: 13px; color: #666; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h2 id="app-title">Ввод посещаемости</h2>
+        <div class="lang-switch">
+            <button onclick="switchLang('ru')">РУС</button>
+            <button onclick="switchLang('kg')">КЫР</button>
+        </div>
+    </header>
+
+    <div class="card">
+        <div class="date-line" id="date-line"></div>
+
+        <form id="teacher-form">
+            <div class="form-group">
+                <label id="lbl-shift">Смена (Нөөмөт)</label>
+                <select id="shift-select">
+                    <option value="1">1-смена</option>
+                    <option value="2">2-смена</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label id="lbl-class">Класс (например: 7-А, 7-Ф)</label>
+                <input type="text" id="class-name" placeholder="7-А" required>
+            </div>
+
+            <!-- Bazadagi joriy holat (barcha qurilmalarda real-time bir xil) -->
+            <div class="live-box" id="live-box"></div>
+
+            <div class="form-group">
+                <label id="lbl-total">Общее кол-во учащихся в классе (Жалпы окуучу саны)</label>
+                <input type="number" id="total-students" placeholder="35" required min="1">
+            </div>
+
+            <div class="form-group">
+                <label id="lbl-lesson-type">Выберите урок для отправки (Жөнөтүлө турган сабак)</label>
+                <select id="lesson-type">
+                    <option value="1">1-урок</option>
+                    <option value="2">2-урок</option>
+                    <option value="6">6-урок</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="group-lesson-count">
+                <label id="lbl-lesson-count">Присутствовало на уроке</label>
+                <input type="number" id="lesson-count" placeholder="30" required min="0">
+                <div class="info-note" id="note-text">Введите количество пришедших учеников на выбранный урок.</div>
+            </div>
+
+            <button type="submit" class="btn-submit" id="btn-send">Отправить директору</button>
+        </form>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        projectId: "qr-code-hujamov"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const translations = {
+        ru: {
+            appTitle: "Ввод посещаемости",
+            lblShift: "Смена",
+            lblClass: "Класс (например: 7-А, 7-Ф)",
+            lblTotal: "Общее кол-во учащихся в классе",
+            lblLessonType: "Выберите урок для отправки",
+            lblLessonCount: "Присутствовало на уроке",
+            noteText: "Введите количество пришедших учеников на выбранный урок.",
+            btnSend: "Отправить директору",
+            successMsg: "Данные успешно отправлены директору!",
+            dateLabel: "Дата",
+            liveLabel: "Сейчас в базе",
+            liveTotal: "всего",
+            lesson: "урок"
+        },
+        kg: {
+            appTitle: "Катышууну киргизүү",
+            lblShift: "Нөөмөт (Смена)",
+            lblClass: "Класс (мисалы: 7-А, 7-Ф)",
+            lblTotal: "Класстагы окуучулардын жалпы саны",
+            lblLessonType: "Жөнөтүлө турган сабакты тандаңыз",
+            lblLessonCount: "Сабакта катышкандардын саны",
+            noteText: "Тандалган сабакта келген окуучулардын санын киргизиңиз.",
+            btnSend: "Директорго жөнөтүү",
+            successMsg: "Маалымат директорго ийгиликтүү жөнөтүлдү!",
+            dateLabel: "Күнү",
+            liveLabel: "Базада азыр",
+            liveTotal: "жалпы",
+            lesson: "сабак"
+        }
+    };
+
+    let currentLang = 'ru';
+
+    // Bugungi sana (qurilmaning mahalliy vaqti bo'yicha) YYYY-MM-DD
+    function todayStr() {
+        const d = new Date();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${d.getFullYear()}-${m}-${day}`;
+    }
+
+    // Lotin harflarini kirill ko'rinishdoshlariga almashtirish (7-A va 7-А bitta bo'lsin)
+    const latinToCyr = { A:'А', B:'В', C:'С', E:'Е', H:'Н', K:'К', M:'М', O:'О', P:'Р', T:'Т', X:'Х' };
+    function normalizeClass(str) {
+        return str.trim().toUpperCase().replace(/\s+/g, '')
+            .split('').map(ch => latinToCyr[ch] || ch).join('');
+    }
+
+    function makeDocId(date, shift, className) {
+        return `${date}_${shift}_${className}`;
+    }
+
+    window.switchLang = function(lang) {
+        currentLang = lang;
+        const t = translations[lang];
+        document.getElementById('app-title').innerText = t.appTitle;
+        document.getElementById('lbl-shift').innerText = t.lblShift;
+        document.getElementById('lbl-class').innerText = t.lblClass;
+        document.getElementById('lbl-total').innerText = t.lblTotal;
+        document.getElementById('lbl-lesson-type').innerText = t.lblLessonType;
+        document.getElementById('lbl-lesson-count').innerText = t.lblLessonCount;
+        document.getElementById('note-text').innerText = t.noteText;
+        document.getElementById('btn-send').innerText = t.btnSend;
+        document.getElementById('date-line').innerText = `${t.dateLabel}: ${todayStr()}`;
+        renderLive();
+    };
+
+    // ---- Real-time: tanlangan sinf holatini bazadan jonli ko'rsatish ----
+    let liveData = null;
+    let unsubscribe = null;
+
+    function renderLive() {
+        const box = document.getElementById('live-box');
+        if (!liveData) { box.style.display = 'none'; return; }
+        const t = translations[currentLang];
+        box.style.display = 'block';
+        box.innerText =
+            `${t.liveLabel}: 1-${t.lesson}: ${liveData.l1 || 0} | ` +
+            `2-${t.lesson}: ${liveData.l2 || 0} | ` +
+            `6-${t.lesson}: ${liveData.l6 || 0} | ` +
+            `${t.liveTotal}: ${liveData.total || 0}`;
+    }
+
+    function watchCurrentClass() {
+        if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+        liveData = null;
+        renderLive();
+
+        const shift = document.getElementById('shift-select').value;
+        const className = normalizeClass(document.getElementById('class-name').value);
+        if (!className) return;
+
+        const ref = doc(db, "attendance", makeDocId(todayStr(), shift, className));
+        unsubscribe = onSnapshot(ref, (snap) => {
+            liveData = snap.exists() ? snap.data() : null;
+            if (liveData && !document.getElementById('total-students').value) {
+                document.getElementById('total-students').value = liveData.total || '';
+            }
+            renderLive();
+        });
+    }
+
+    document.getElementById('shift-select').addEventListener('change', watchCurrentClass);
+    document.getElementById('class-name').addEventListener('input', watchCurrentClass);
+
+    // ---- Yuborish ----
+    document.getElementById('teacher-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const btn = document.getElementById('btn-send');
+        const shift = document.getElementById('shift-select').value;
+        const className = normalizeClass(document.getElementById('class-name').value);
+        const total = parseInt(document.getElementById('total-students').value);
+        const lessonType = document.getElementById('lesson-type').value;
+        const count = parseInt(document.getElementById('lesson-count').value);
+        const date = todayStr();
+
+        const docRef = doc(db, "attendance", makeDocId(date, shift, className));
+
+        // Faqat o'zgargan maydonlarni yozamiz (merge) — ikki qurilmadan yozsa ham bir-birini o'chirmaydi
+        const dataToSave = {
+            date: date,
+            shift: shift,
+            className: className,
+            total: total,
+            updatedAt: Date.now()
+        };
+        dataToSave['l' + lessonType] = count;
+
+        btn.disabled = true;
+        try {
+            await setDoc(docRef, dataToSave, { merge: true });
+            alert(translations[currentLang].successMsg);
+            document.getElementById('lesson-count').value = '';
+        } catch (error) {
+            console.error("Xatolik: ", error);
+            alert("Xatolik yuz berdi: " + error.message);
+        } finally {
+            btn.disabled = false;
+        }
+    });
+
+    switchLang('ru');
+</script>
+
+</body>
+</html>
