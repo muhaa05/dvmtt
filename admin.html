@@ -47,6 +47,7 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             margin-bottom: 20px;
         }
+        .card h3 { margin: 0 0 15px 0; }
         .controls {
             display: flex;
             flex-wrap: wrap;
@@ -54,20 +55,23 @@
             align-items: center;
             margin-bottom: 15px;
         }
-        select, button, input[type="date"] {
+        select, button, input {
             padding: 8px 12px;
             border: 1px solid #ccc;
             border-radius: 4px;
+            font-size: 14px;
         }
-        .btn-refresh {
+        .btn-refresh, .btn-add {
             background: var(--accent-color);
             color: white;
             border: none;
             cursor: pointer;
             font-weight: bold;
         }
+        .btn-add { background: #27ae60; }
         .status { font-size: 13px; color: #27ae60; font-weight: 600; }
         .status.offline { color: #c0392b; }
+        .note { font-size: 13px; color: #666; margin: 10px 0 0 0; }
         .table-responsive { overflow-x: auto; }
         table {
             width: 100%;
@@ -89,33 +93,47 @@
             font-weight: bold;
             background-color: #e8f4f8 !important;
         }
+        .muted { color: #aaa; }
+        .manage-row { display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .manage-row input { width: 70px; text-align: center; }
+        .btn-small {
+            width: 32px; height: 32px; padding: 0;
+            background: #ecf0f1; cursor: pointer; font-weight: bold; font-size: 16px;
+        }
+        .btn-del {
+            background: #e74c3c; color: white; border: none; cursor: pointer; padding: 6px 10px;
+        }
+        .add-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+        .add-form label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <header>
-        <h2 id="app-title">Панель директора: Отчет посещаемости</h2>
+        <h2 id="app-title">Панель директора</h2>
         <div class="lang-switch">
             <button onclick="switchLang('ru')">РУС</button>
             <button onclick="switchLang('kg')">КЫР</button>
         </div>
     </header>
 
+    <!-- 1. Отчёт -->
     <div class="card">
+        <h3 id="h-report">Отчет посещаемости</h3>
         <div class="controls">
             <div>
                 <label id="lbl-date-filter" style="font-weight:600; font-size:14px;">Дата:</label>
-                <input type="date" id="filter-date" onchange="renderTable()">
+                <input type="date" id="filter-date" onchange="renderAll()">
             </div>
             <div>
                 <label id="lbl-shift-filter" style="font-weight:600; font-size:14px;">Смена:</label>
-                <select id="filter-shift" onchange="renderTable()">
+                <select id="filter-shift" onchange="renderAll()">
                     <option value="1">1-смена</option>
                     <option value="2">2-смена</option>
                 </select>
             </div>
-            <button class="btn-refresh" onclick="renderTable()" id="btn-refresh">Обновить данные</button>
+            <button class="btn-refresh" onclick="renderAll()" id="btn-refresh">Обновить данные</button>
             <span class="status" id="status">●</span>
         </div>
 
@@ -141,12 +159,53 @@
                 </tfoot>
             </table>
         </div>
+        <p class="note" id="report-note"></p>
+    </div>
+
+    <!-- 2. Классы и количество учеников -->
+    <div class="card">
+        <h3 id="h-manage">Классы и количество учеников</h3>
+
+        <div class="add-form">
+            <div>
+                <label id="lbl-add-shift">Смена</label>
+                <select id="add-shift">
+                    <option value="1">1-смена</option>
+                    <option value="2">2-смена</option>
+                </select>
+            </div>
+            <div>
+                <label id="lbl-add-class">Класс</label>
+                <input type="text" id="add-class" placeholder="7-А" style="width:100px;">
+            </div>
+            <div>
+                <label id="lbl-add-total">Кол-во учеников</label>
+                <input type="number" id="add-total" placeholder="30" min="1" style="width:110px;">
+            </div>
+            <button class="btn-add" onclick="addClass()" id="btn-add">Добавить класс</button>
+        </div>
+
+        <p class="note" id="manage-note"></p>
+
+        <div class="table-responsive" style="margin-top:15px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>№</th>
+                        <th id="th-m-class">Класс</th>
+                        <th id="th-m-total">Кол-во учеников</th>
+                        <th id="th-m-del"></th>
+                    </tr>
+                </thead>
+                <tbody id="manage-body"></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
         projectId: "qr-code-hujamov"
@@ -157,7 +216,8 @@
 
     const translations = {
         ru: {
-            appTitle: "Панель директора: Отчет посещаемости",
+            appTitle: "Панель директора",
+            hReport: "Отчет посещаемости",
             lblDateFilter: "Дата:",
             lblShiftFilter: "Смена:",
             btnRefresh: "Обновить данные",
@@ -172,10 +232,25 @@
             thRate: "Посещаемость %",
             totalText: "Итого",
             online: "● Онлайн (данные обновляются сами)",
-            offline: "● Нет связи с базой"
+            offline: "● Нет связи с базой",
+            notSent: "Ещё не отправили данные",
+            noClassesReport: "Классы ещё не добавлены. Добавьте их ниже в разделе «Классы и количество учеников».",
+            hManage: "Классы и количество учеников",
+            lblAddShift: "Смена",
+            lblAddClass: "Класс",
+            lblAddTotal: "Кол-во учеников",
+            btnAdd: "Добавить класс",
+            thMClass: "Класс",
+            thMTotal: "Кол-во учеников",
+            manageNote: "Показаны классы выбранной смены. Если класс уже есть, он обновится.",
+            del: "Удалить",
+            confirmDel: "Удалить класс",
+            fillAll: "Введите название класса и количество учеников",
+            noManage: "В этой смене пока нет классов"
         },
         kg: {
-            appTitle: "Директор панели: Катышуу отчёту",
+            appTitle: "Директор панели",
+            hReport: "Катышуу отчёту",
             lblDateFilter: "Күнү:",
             lblShiftFilter: "Нөөмөт:",
             btnRefresh: "Жаңыртуу",
@@ -190,11 +265,30 @@
             thRate: "Катышуу %",
             totalText: "Жыйынтык",
             online: "● Онлайн (маалымат өзү жаңырат)",
-            offline: "● Базага байланыш жок"
+            offline: "● Базага байланыш жок",
+            notSent: "Маалымат дагы жөнөтө элек",
+            noClassesReport: "Класстар кошула элек. Төмөндө «Класстар жана окуучулардын саны» бөлүмүнөн кошуңуз.",
+            hManage: "Класстар жана окуучулардын саны",
+            lblAddShift: "Нөөмөт",
+            lblAddClass: "Класс",
+            lblAddTotal: "Окуучулардын саны",
+            btnAdd: "Класс кошуу",
+            thMClass: "Класс",
+            thMTotal: "Окуучулардын саны",
+            manageNote: "Тандалган нөөмөттүн класстары көрсөтүлгөн. Класс бар болсо, жаңыланат.",
+            del: "Өчүрүү",
+            confirmDel: "Классты өчүрүү",
+            fillAll: "Класстын атын жана окуучулардын санын киргизиңиз",
+            noManage: "Бул нөөмөттө класстар жок"
         }
     };
 
     let currentLang = 'ru';
+    let classesData = [];
+    let attendanceData = [];
+    let statusOnline = true;
+
+    const el = (id) => document.getElementById(id);
 
     function todayStr() {
         const d = new Date();
@@ -202,73 +296,192 @@
         const day = String(d.getDate()).padStart(2, '0');
         return `${d.getFullYear()}-${m}-${day}`;
     }
+    el('filter-date').value = todayStr();
 
-    document.getElementById('filter-date').value = todayStr();
-
-    window.switchLang = function(lang) {
-        currentLang = lang;
-        const t = translations[lang];
-        document.getElementById('app-title').innerText = t.appTitle;
-        document.getElementById('lbl-date-filter').innerText = t.lblDateFilter;
-        document.getElementById('lbl-shift-filter').innerText = t.lblShiftFilter;
-        document.getElementById('btn-refresh').innerText = t.btnRefresh;
-        document.getElementById('th-class').innerText = t.thClass;
-        document.getElementById('th-total').innerText = t.thTotal;
-        document.getElementById('th-l1').innerText = t.thL1;
-        document.getElementById('th-l2').innerText = t.thL2;
-        document.getElementById('th-late').innerText = t.thLate;
-        document.getElementById('th-late-p').innerText = t.thLateP;
-        document.getElementById('th-l6').innerText = t.thL6;
-        document.getElementById('th-escaped').innerText = t.thEscaped;
-        document.getElementById('th-rate').innerText = t.thRate;
-        setStatus(statusOnline);
-        renderTable();
-    };
-
-    let globalData = [];
-    let statusOnline = true;
-
-    function setStatus(online) {
-        statusOnline = online;
-        const el = document.getElementById('status');
-        el.innerText = translations[currentLang][online ? 'online' : 'offline'];
-        el.className = 'status' + (online ? '' : ' offline');
+    // Лотин ҳарфларини кирилл кўринишдошларига алмаштириш, фақат ҳарф/рақам/дефис
+    const latinToCyr = { A:'А', B:'В', C:'С', E:'Е', H:'Н', K:'К', M:'М', O:'О', P:'Р', T:'Т', X:'Х' };
+    function normalizeClass(str) {
+        return str.trim().toUpperCase()
+            .replace(/[^0-9\p{L}\-]/gu, '')
+            .split('').map(ch => latinToCyr[ch] || ch).join('');
     }
 
-    // Real-time: istalgan qurilmadan yozilgan o'zgarish shu zahoti keladi
-    onSnapshot(collection(db, "attendance"), (snapshot) => {
-        globalData = [];
-        snapshot.forEach((d) => globalData.push(d.data()));
-        setStatus(true);
-        renderTable();
-    }, (error) => {
-        console.error("Firestore xatolik:", error);
-        setStatus(false);
-    });
+    function sortByClass(a, b) {
+        return String(a.className).localeCompare(String(b.className), undefined, { numeric: true });
+    }
 
     function esc(s) {
         return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     }
 
-    window.renderTable = function() {
-        const shift = document.getElementById('filter-shift').value;
-        const date = document.getElementById('filter-date').value || todayStr();
-        const tbody = document.getElementById('table-body');
-        const tfoot = document.getElementById('table-total');
+    // ---------- Тил ----------
+    window.switchLang = function(lang) {
+        currentLang = lang;
+        const t = translations[lang];
+        el('app-title').innerText = t.appTitle;
+        el('h-report').innerText = t.hReport;
+        el('lbl-date-filter').innerText = t.lblDateFilter;
+        el('lbl-shift-filter').innerText = t.lblShiftFilter;
+        el('btn-refresh').innerText = t.btnRefresh;
+        el('th-class').innerText = t.thClass;
+        el('th-total').innerText = t.thTotal;
+        el('th-l1').innerText = t.thL1;
+        el('th-l2').innerText = t.thL2;
+        el('th-late').innerText = t.thLate;
+        el('th-late-p').innerText = t.thLateP;
+        el('th-l6').innerText = t.thL6;
+        el('th-escaped').innerText = t.thEscaped;
+        el('th-rate').innerText = t.thRate;
+        el('h-manage').innerText = t.hManage;
+        el('lbl-add-shift').innerText = t.lblAddShift;
+        el('lbl-add-class').innerText = t.lblAddClass;
+        el('lbl-add-total').innerText = t.lblAddTotal;
+        el('btn-add').innerText = t.btnAdd;
+        el('th-m-class').innerText = t.thMClass;
+        el('th-m-total').innerText = t.thMTotal;
+        el('manage-note').innerText = t.manageNote;
+        setStatus(statusOnline);
+        renderAll();
+    };
+
+    function setStatus(online) {
+        statusOnline = online;
+        const s = el('status');
+        s.innerText = translations[currentLang][online ? 'online' : 'offline'];
+        s.className = 'status' + (online ? '' : ' offline');
+    }
+
+    // ---------- Real-time ----------
+    onSnapshot(collection(db, "classes"), (snap) => {
+        classesData = [];
+        snap.forEach(d => classesData.push(d.data()));
+        setStatus(true);
+        renderAll();
+    }, (err) => { console.error(err); setStatus(false); });
+
+    onSnapshot(collection(db, "attendance"), (snap) => {
+        attendanceData = [];
+        snap.forEach(d => attendanceData.push(d.data()));
+        setStatus(true);
+        renderAll();
+    }, (err) => { console.error(err); setStatus(false); });
+
+    // ---------- Класс қўшиш / ўзгартириш / ўчириш ----------
+    window.addClass = async function() {
+        const shift = el('add-shift').value;
+        const className = normalizeClass(el('add-class').value);
+        const total = parseInt(el('add-total').value);
+        if (!className || !total || total < 1) {
+            alert(translations[currentLang].fillAll);
+            return;
+        }
+        try {
+            await setDoc(doc(db, "classes", `${shift}_${className}`), { shift, className, total });
+            el('add-class').value = '';
+            el('add-total').value = '';
+            el('filter-shift').value = shift;
+            renderAll();
+        } catch (e) {
+            alert("Xatolik: " + e.message);
+        }
+    };
+
+    window.setTotal = async function(id, value) {
+        const total = Math.max(1, parseInt(value) || 1);
+        const cls = classesData.find(c => `${c.shift}_${c.className}` === id);
+        if (!cls) return;
+        try {
+            await setDoc(doc(db, "classes", id), { shift: cls.shift, className: cls.className, total });
+        } catch (e) {
+            alert("Xatolik: " + e.message);
+        }
+    };
+
+    window.changeTotal = function(id, delta) {
+        const cls = classesData.find(c => `${c.shift}_${c.className}` === id);
+        if (!cls) return;
+        window.setTotal(id, cls.total + delta);
+    };
+
+    window.removeClass = async function(id) {
+        const cls = classesData.find(c => `${c.shift}_${c.className}` === id);
+        if (!cls) return;
+        if (!confirm(`${translations[currentLang].confirmDel} ${cls.className}?`)) return;
+        try {
+            await deleteDoc(doc(db, "classes", id));
+        } catch (e) {
+            alert("Xatolik: " + e.message);
+        }
+    };
+
+    // ---------- Чизиш ----------
+    window.renderAll = function() {
+        renderReport();
+        renderManage();
+    };
+
+    function renderManage() {
+        const t = translations[currentLang];
+        const shift = el('filter-shift').value;
+        const body = el('manage-body');
+        const list = classesData.filter(c => c.shift === shift).sort(sortByClass);
+
+        if (list.length === 0) {
+            body.innerHTML = `<tr><td colspan="4" class="muted">${t.noManage}</td></tr>`;
+            return;
+        }
+
+        body.innerHTML = list.map((c, i) => {
+            const id = `${c.shift}_${c.className}`;
+            return `
+            <tr>
+                <td>${i + 1}</td>
+                <td><strong>${esc(c.className)}</strong></td>
+                <td>
+                    <div class="manage-row">
+                        <button class="btn-small" onclick="changeTotal('${id}', -1)">−</button>
+                        <input type="number" min="1" value="${c.total}" onchange="setTotal('${id}', this.value)">
+                        <button class="btn-small" onclick="changeTotal('${id}', 1)">+</button>
+                    </div>
+                </td>
+                <td><button class="btn-del" onclick="removeClass('${id}')">${t.del}</button></td>
+            </tr>`;
+        }).join('');
+    }
+
+    function renderReport() {
+        const t = translations[currentLang];
+        const shift = el('filter-shift').value;
+        const date = el('filter-date').value || todayStr();
+        const tbody = el('table-body');
+        const tfoot = el('table-total');
         tbody.innerHTML = '';
 
-        const filteredData = globalData
-            .filter(item => item.shift === shift && item.date === date)
-            .sort((a, b) => String(a.className).localeCompare(String(b.className), undefined, { numeric: true }));
+        const list = classesData.filter(c => c.shift === shift).sort(sortByClass);
 
         let sumTotal = 0, sumL1 = 0, sumL2 = 0, sumLate = 0, sumL6 = 0, sumEscaped = 0;
+        let notSent = [];
         let index = 1;
 
-        filteredData.forEach(item => {
-            const total = item.total || 0;
-            const l1 = item.l1 || 0;
-            const l2 = item.l2 || 0;
-            const l6 = item.l6 || 0;
+        list.forEach(c => {
+            const att = attendanceData.find(a => a.date === date && a.shift === shift && a.className === c.className);
+            const tr = document.createElement('tr');
+
+            if (!att) {
+                notSent.push(c.className);
+                tr.innerHTML = `
+                    <td>${index++}</td>
+                    <td><strong>${esc(c.className)}</strong></td>
+                    <td>${c.total}</td>
+                    <td class="muted" colspan="7">${t.notSent}</td>`;
+                tbody.appendChild(tr);
+                return;
+            }
+
+            const total = c.total || 0;
+            const l1 = att.l1 || 0;
+            const l2 = att.l2 || 0;
+            const l6 = att.l6 || 0;
 
             const late = Math.max(0, l2 - l1);
             const latePercent = total > 0 ? Math.round((late / total) * 100) : 0;
@@ -282,10 +495,9 @@
             sumL6 += l6;
             sumEscaped += escaped;
 
-            const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${index++}</td>
-                <td><strong>${esc(item.className)}</strong></td>
+                <td><strong>${esc(c.className)}</strong></td>
                 <td>${total}</td>
                 <td>${l1}</td>
                 <td>${l2}</td>
@@ -293,17 +505,15 @@
                 <td>${latePercent}%</td>
                 <td>${l6}</td>
                 <td>${escaped}</td>
-                <td><strong>${rate}%</strong></td>
-            `;
+                <td><strong>${rate}%</strong></td>`;
             tbody.appendChild(tr);
         });
 
         const totalLatePercent = sumTotal > 0 ? Math.round((sumLate / sumTotal) * 100) : 0;
         const totalRatePercent = sumTotal > 0 ? Math.round((sumL2 / sumTotal) * 100) : 0;
-        const tText = translations[currentLang].totalText;
 
         tfoot.innerHTML = `
-            <td colspan="2">${tText}:</td>
+            <td colspan="2">${t.totalText}:</td>
             <td>${sumTotal}</td>
             <td>${sumL1}</td>
             <td>${sumL2}</td>
@@ -311,9 +521,17 @@
             <td>${totalLatePercent}%</td>
             <td>${sumL6}</td>
             <td>${sumEscaped}</td>
-            <td>${totalRatePercent}%</td>
-        `;
-    };
+            <td>${totalRatePercent}%</td>`;
+
+        const note = el('report-note');
+        if (list.length === 0) {
+            note.innerText = t.noClassesReport;
+        } else if (notSent.length > 0) {
+            note.innerText = `${t.notSent}: ${notSent.join(', ')}`;
+        } else {
+            note.innerText = '';
+        }
+    }
 
     switchLang('ru');
 </script>
