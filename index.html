@@ -76,6 +76,15 @@
             padding: 10px 12px;
             font-size: 14px;
             margin-bottom: 15px;
+            line-height: 1.5;
+        }
+        .empty-box {
+            background: #fdecea;
+            color: #a93226;
+            border-radius: 4px;
+            padding: 10px 12px;
+            font-size: 14px;
+            margin-bottom: 15px;
             display: none;
         }
         .date-line { font-size: 13px; color: #666; margin-bottom: 15px; }
@@ -97,7 +106,7 @@
 
         <form id="teacher-form">
             <div class="form-group">
-                <label id="lbl-shift">Смена (Нөөмөт)</label>
+                <label id="lbl-shift">Смена</label>
                 <select id="shift-select">
                     <option value="1">1-смена</option>
                     <option value="2">2-смена</option>
@@ -105,20 +114,16 @@
             </div>
 
             <div class="form-group">
-                <label id="lbl-class">Класс (например: 7-А, 7-Ф)</label>
-                <input type="text" id="class-name" placeholder="7-А" required>
+                <label id="lbl-class">Класс</label>
+                <select id="class-select" required></select>
             </div>
 
-            <!-- Bazadagi joriy holat (barcha qurilmalarda real-time bir xil) -->
+            <div class="empty-box" id="empty-box"></div>
+
             <div class="live-box" id="live-box"></div>
 
             <div class="form-group">
-                <label id="lbl-total">Общее кол-во учащихся в классе (Жалпы окуучу саны)</label>
-                <input type="number" id="total-students" placeholder="35" required min="1">
-            </div>
-
-            <div class="form-group">
-                <label id="lbl-lesson-type">Выберите урок для отправки (Жөнөтүлө турган сабак)</label>
+                <label id="lbl-lesson-type">Выберите урок для отправки</label>
                 <select id="lesson-type">
                     <option value="1">1-урок</option>
                     <option value="2">2-урок</option>
@@ -126,7 +131,7 @@
                 </select>
             </div>
 
-            <div class="form-group" id="group-lesson-count">
+            <div class="form-group">
                 <label id="lbl-lesson-count">Присутствовало на уроке</label>
                 <input type="number" id="lesson-count" placeholder="30" required min="0">
                 <div class="info-note" id="note-text">Введите количество пришедших учеников на выбранный урок.</div>
@@ -139,7 +144,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, doc, setDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
         projectId: "qr-code-hujamov"
@@ -152,8 +157,7 @@
         ru: {
             appTitle: "Ввод посещаемости",
             lblShift: "Смена",
-            lblClass: "Класс (например: 7-А, 7-Ф)",
-            lblTotal: "Общее кол-во учащихся в классе",
+            lblClass: "Класс",
             lblLessonType: "Выберите урок для отправки",
             lblLessonCount: "Присутствовало на уроке",
             noteText: "Введите количество пришедших учеников на выбранный урок.",
@@ -161,14 +165,16 @@
             successMsg: "Данные успешно отправлены директору!",
             dateLabel: "Дата",
             liveLabel: "Сейчас в базе",
-            liveTotal: "всего",
-            lesson: "урок"
+            total: "Всего в классе",
+            lesson: "урок",
+            noClasses: "Директор ещё не добавил классы для этой смены.",
+            chooseClass: "— выберите класс —",
+            tooMany: "Число присутствующих больше, чем учеников в классе"
         },
         kg: {
             appTitle: "Катышууну киргизүү",
             lblShift: "Нөөмөт (Смена)",
-            lblClass: "Класс (мисалы: 7-А, 7-Ф)",
-            lblTotal: "Класстагы окуучулардын жалпы саны",
+            lblClass: "Класс",
             lblLessonType: "Жөнөтүлө турган сабакты тандаңыз",
             lblLessonCount: "Сабакта катышкандардын саны",
             noteText: "Тандалган сабакта келген окуучулардын санын киргизиңиз.",
@@ -176,14 +182,18 @@
             successMsg: "Маалымат директорго ийгиликтүү жөнөтүлдү!",
             dateLabel: "Күнү",
             liveLabel: "Базада азыр",
-            liveTotal: "жалпы",
-            lesson: "сабак"
+            total: "Класста жалпы",
+            lesson: "сабак",
+            noClasses: "Директор бул нөөмөт үчүн класстарды кошо элек.",
+            chooseClass: "— класс тандаңыз —",
+            tooMany: "Катышкандардын саны класстагы окуучулардан көп"
         }
     };
 
     let currentLang = 'ru';
+    let classesData = [];   // директор қўшган класслар
+    let attData = {};       // бугунги давомат: className -> data
 
-    // Bugungi sana (qurilmaning mahalliy vaqti bo'yicha) YYYY-MM-DD
     function todayStr() {
         const d = new Date();
         const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -191,90 +201,106 @@
         return `${d.getFullYear()}-${m}-${day}`;
     }
 
-    // Lotin harflarini kirill ko'rinishdoshlariga almashtirish (7-A va 7-А bitta bo'lsin)
-    const latinToCyr = { A:'А', B:'В', C:'С', E:'Е', H:'Н', K:'К', M:'М', O:'О', P:'Р', T:'Т', X:'Х' };
-    function normalizeClass(str) {
-        return str.trim().toUpperCase().replace(/\s+/g, '')
-            .split('').map(ch => latinToCyr[ch] || ch).join('');
+    const el = (id) => document.getElementById(id);
+
+    // ---------- Классларни базадан олиш (real-time) ----------
+    onSnapshot(collection(db, "classes"), (snap) => {
+        classesData = [];
+        snap.forEach(d => classesData.push(d.data()));
+        fillClassSelect();
+    });
+
+    // ---------- Бугунги давомат (real-time) ----------
+    onSnapshot(collection(db, "attendance"), (snap) => {
+        attData = {};
+        const today = todayStr();
+        snap.forEach(d => {
+            const x = d.data();
+            if (x.date === today) attData[x.shift + '_' + x.className] = x;
+        });
+        renderLive();
+    });
+
+    function fillClassSelect() {
+        const shift = el('shift-select').value;
+        const select = el('class-select');
+        const prev = select.value;
+        const t = translations[currentLang];
+
+        const list = classesData
+            .filter(c => c.shift === shift)
+            .sort((a, b) => String(a.className).localeCompare(String(b.className), undefined, { numeric: true }));
+
+        select.innerHTML = `<option value="">${t.chooseClass}</option>` +
+            list.map(c => `<option value="${c.className}">${c.className} (${c.total})</option>`).join('');
+
+        if (list.some(c => c.className === prev)) select.value = prev;
+
+        const empty = el('empty-box');
+        empty.innerText = t.noClasses;
+        empty.style.display = list.length === 0 ? 'block' : 'none';
+        renderLive();
     }
 
-    function makeDocId(date, shift, className) {
-        return `${date}_${shift}_${className}`;
+    function renderLive() {
+        const box = el('live-box');
+        const shift = el('shift-select').value;
+        const className = el('class-select').value;
+        const t = translations[currentLang];
+
+        if (!className) { box.style.display = 'none'; return; }
+
+        const cls = classesData.find(c => c.shift === shift && c.className === className);
+        const att = attData[shift + '_' + className] || {};
+        box.style.display = 'block';
+        box.innerHTML =
+            `<strong>${t.total}: ${cls ? cls.total : '—'}</strong><br>` +
+            `${t.liveLabel}: 1-${t.lesson}: ${att.l1 ?? '—'} | ` +
+            `2-${t.lesson}: ${att.l2 ?? '—'} | ` +
+            `6-${t.lesson}: ${att.l6 ?? '—'}`;
     }
+
+    el('shift-select').addEventListener('change', fillClassSelect);
+    el('class-select').addEventListener('change', renderLive);
 
     window.switchLang = function(lang) {
         currentLang = lang;
         const t = translations[lang];
-        document.getElementById('app-title').innerText = t.appTitle;
-        document.getElementById('lbl-shift').innerText = t.lblShift;
-        document.getElementById('lbl-class').innerText = t.lblClass;
-        document.getElementById('lbl-total').innerText = t.lblTotal;
-        document.getElementById('lbl-lesson-type').innerText = t.lblLessonType;
-        document.getElementById('lbl-lesson-count').innerText = t.lblLessonCount;
-        document.getElementById('note-text').innerText = t.noteText;
-        document.getElementById('btn-send').innerText = t.btnSend;
-        document.getElementById('date-line').innerText = `${t.dateLabel}: ${todayStr()}`;
-        renderLive();
+        el('app-title').innerText = t.appTitle;
+        el('lbl-shift').innerText = t.lblShift;
+        el('lbl-class').innerText = t.lblClass;
+        el('lbl-lesson-type').innerText = t.lblLessonType;
+        el('lbl-lesson-count').innerText = t.lblLessonCount;
+        el('note-text').innerText = t.noteText;
+        el('btn-send').innerText = t.btnSend;
+        el('date-line').innerText = `${t.dateLabel}: ${todayStr()}`;
+        fillClassSelect();
     };
 
-    // ---- Real-time: tanlangan sinf holatini bazadan jonli ko'rsatish ----
-    let liveData = null;
-    let unsubscribe = null;
-
-    function renderLive() {
-        const box = document.getElementById('live-box');
-        if (!liveData) { box.style.display = 'none'; return; }
-        const t = translations[currentLang];
-        box.style.display = 'block';
-        box.innerText =
-            `${t.liveLabel}: 1-${t.lesson}: ${liveData.l1 || 0} | ` +
-            `2-${t.lesson}: ${liveData.l2 || 0} | ` +
-            `6-${t.lesson}: ${liveData.l6 || 0} | ` +
-            `${t.liveTotal}: ${liveData.total || 0}`;
-    }
-
-    function watchCurrentClass() {
-        if (unsubscribe) { unsubscribe(); unsubscribe = null; }
-        liveData = null;
-        renderLive();
-
-        const shift = document.getElementById('shift-select').value;
-        const className = normalizeClass(document.getElementById('class-name').value);
-        if (!className) return;
-
-        const ref = doc(db, "attendance", makeDocId(todayStr(), shift, className));
-        unsubscribe = onSnapshot(ref, (snap) => {
-            liveData = snap.exists() ? snap.data() : null;
-            if (liveData && !document.getElementById('total-students').value) {
-                document.getElementById('total-students').value = liveData.total || '';
-            }
-            renderLive();
-        });
-    }
-
-    document.getElementById('shift-select').addEventListener('change', watchCurrentClass);
-    document.getElementById('class-name').addEventListener('input', watchCurrentClass);
-
-    // ---- Yuborish ----
-    document.getElementById('teacher-form').addEventListener('submit', async function(e) {
+    // ---------- Юбориш ----------
+    el('teacher-form').addEventListener('submit', async function(e) {
         e.preventDefault();
 
-        const btn = document.getElementById('btn-send');
-        const shift = document.getElementById('shift-select').value;
-        const className = normalizeClass(document.getElementById('class-name').value);
-        const total = parseInt(document.getElementById('total-students').value);
-        const lessonType = document.getElementById('lesson-type').value;
-        const count = parseInt(document.getElementById('lesson-count').value);
+        const btn = el('btn-send');
+        const shift = el('shift-select').value;
+        const className = el('class-select').value;
+        const lessonType = el('lesson-type').value;
+        const count = parseInt(el('lesson-count').value);
         const date = todayStr();
 
-        const docRef = doc(db, "attendance", makeDocId(date, shift, className));
+        if (!className) return;
 
-        // Faqat o'zgargan maydonlarni yozamiz (merge) — ikki qurilmadan yozsa ham bir-birini o'chirmaydi
+        const cls = classesData.find(c => c.shift === shift && c.className === className);
+        if (cls && count > cls.total) {
+            alert(`${translations[currentLang].tooMany} (${cls.total})`);
+            return;
+        }
+
+        const docRef = doc(db, "attendance", `${date}_${shift}_${className}`);
         const dataToSave = {
             date: date,
             shift: shift,
             className: className,
-            total: total,
             updatedAt: Date.now()
         };
         dataToSave['l' + lessonType] = count;
@@ -283,7 +309,7 @@
         try {
             await setDoc(docRef, dataToSave, { merge: true });
             alert(translations[currentLang].successMsg);
-            document.getElementById('lesson-count').value = '';
+            el('lesson-count').value = '';
         } catch (error) {
             console.error("Xatolik: ", error);
             alert("Xatolik yuz berdi: " + error.message);
