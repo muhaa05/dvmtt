@@ -1,540 +1,245 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Панель директора / Директор панели</title>
-    <style>
-        :root {
-            --primary-color: #2c3e50;
-            --accent-color: #3498db;
-            --bg-color: #f4f6f9;
-            --card-bg: #ffffff;
-            --text-color: #333;
-            --border-radius: 8px;
-        }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 15px;
-        }
-        .container { max-width: 1100px; margin: 0 auto; }
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: var(--primary-color);
-            color: white;
-            padding: 15px 20px;
-            border-radius: var(--border-radius);
-            margin-bottom: 20px;
-        }
-        .lang-switch button {
-            background: var(--accent-color);
-            border: none;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        .card {
-            background: var(--card-bg);
-            padding: 20px;
-            border-radius: var(--border-radius);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-        .card h3 { margin: 0 0 15px 0; }
-        .controls {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-        select, button, input {
-            padding: 8px 12px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-        .btn-refresh, .btn-add {
-            background: var(--accent-color);
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        .btn-add { background: #27ae60; }
-        .status { font-size: 13px; color: #27ae60; font-weight: 600; }
-        .status.offline { color: #c0392b; }
-        .note { font-size: 13px; color: #666; margin: 10px 0 0 0; }
-        .table-responsive { overflow-x: auto; }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            font-size: 13px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: center;
-        }
-        th {
-            background-color: var(--primary-color);
-            color: white;
-        }
-        tr:nth-child(even) { background-color: #f9f9f9; }
-        .total-row {
-            font-weight: bold;
-            background-color: #e8f4f8 !important;
-        }
-        .muted { color: #aaa; }
-        .manage-row { display: flex; align-items: center; justify-content: center; gap: 6px; }
-        .manage-row input { width: 70px; text-align: center; }
-        .btn-small {
-            width: 32px; height: 32px; padding: 0;
-            background: #ecf0f1; cursor: pointer; font-weight: bold; font-size: 16px;
-        }
-        .btn-del {
-            background: #e74c3c; color: white; border: none; cursor: pointer; padding: 6px 10px;
-        }
-        .add-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
-        .add-form label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Панель директора / Директор панели</title>
+<style>
+:root{--ink:#1e2a3a;--mut:#6b7a8d;--bg:#eef2f8;--card:#fff;--ac:#4f46e5;--r:14px}
+*{box-sizing:border-box}
+body{font-family:'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);margin:0;padding:14px}
+.wrap{max-width:1150px;margin:0 auto}
+.hd{background:linear-gradient(135deg,#312e81,#4f46e5 55%,#0ea5e9);color:#fff;border-radius:var(--r);padding:18px 22px;display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;box-shadow:0 8px 24px rgba(79,70,229,.3)}
+.hd h1{margin:0;font-size:22px}
+.hd .st{font-size:12px;opacity:.9}
+.hd .st.off{color:#fecaca}
+.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+select,input,button{font:inherit;font-size:14px;padding:8px 12px;border:1px solid #d5dbe5;border-radius:8px}
+.lang button{background:rgba(255,255,255,.2);color:#fff;border:0;font-weight:700;cursor:pointer}
+.tabs{display:flex;gap:8px;margin:16px 0;flex-wrap:wrap}
+.tabs button{flex:1;min-width:120px;background:#fff;border:0;padding:12px;font-weight:700;cursor:pointer;border-radius:12px;color:var(--mut);box-shadow:0 2px 6px rgba(0,0,0,.06)}
+.tabs button.on{background:var(--ac);color:#fff}
+.panel{display:none}.panel.on{display:block}
+.card{background:var(--card);border-radius:var(--r);padding:18px;margin-bottom:18px;box-shadow:0 4px 14px rgba(30,42,58,.07)}
+.card h3{margin:0 0 12px}
+.ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+.btn{background:var(--ac);color:#fff;border:0;font-weight:700;cursor:pointer}
+.btn.g{background:#16a34a}.btn.r{background:#ef4444}.btn.s{background:#64748b}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:#fff;border-radius:var(--r);padding:14px;box-shadow:0 4px 14px rgba(30,42,58,.07);border-left:5px solid var(--ac)}
+.kpi b{display:block;font-size:26px}.kpi span{font-size:12px;color:var(--mut)}
+.sec{font-size:17px;font-weight:800;margin:20px 0 10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.pc{border-radius:var(--r);padding:16px;color:#fff;position:relative;overflow:hidden;box-shadow:0 8px 20px rgba(0,0,0,.15)}
+.pc .m{font-size:34px}.pc .cn{font-size:28px;font-weight:800}.pc .tc{font-size:13px;opacity:.95;min-height:18px}
+.pc .big{font-size:36px;font-weight:800;margin-top:6px}.pc .sub{font-size:12px;opacity:.95}
+.bar{height:8px;background:rgba(255,255,255,.35);border-radius:6px;margin-top:8px}.bar i{display:block;height:100%;background:#fff;border-radius:6px}
+.c1{background:linear-gradient(135deg,#f59e0b,#fbbf24)}.c2{background:linear-gradient(135deg,#64748b,#94a3b8)}.c3{background:linear-gradient(135deg,#b45309,#d97706)}
+.w{background:linear-gradient(135deg,#dc2626,#f87171)}.l{background:linear-gradient(135deg,#ea580c,#fb923c)}.e{background:linear-gradient(135deg,#7c3aed,#a78bfa)}
+.tr{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border:1px solid #e2e8f0;padding:8px;text-align:center}
+th{background:#312e81;color:#fff}
+tr:nth-child(even){background:#f8fafc}
+.tot{font-weight:700;background:#e0e7ff!important}
+.mu{color:#9aa7b8}.note{font-size:13px;color:var(--mut)}
+.mr{display:flex;align-items:center;justify-content:center;gap:5px}.mr input{width:64px;text-align:center}
+.sm{width:32px;height:32px;padding:0;background:#eef2f8;font-weight:700;cursor:pointer}
+.ptitle{display:none}
+@media print{
+@page{size:A4 landscape;margin:10mm}
+body{background:#fff;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.hd,.tabs,.ctl,.noprint{display:none!important}
+.ptitle{display:block;font-size:20px;font-weight:800;margin-bottom:10px}
+.card,.kpi,.pc{box-shadow:none}
+.card{padding:0}
+.panel:not(.on){display:none!important}
+}
+</style>
 </head>
 <body>
+<div class="wrap">
+<div class="hd">
+ <div><h1 data-t="title">Панель директора</h1><div class="st" id="status">●</div></div>
+ <div class="tools">
+  <select id="shift" onchange="renderAll()"><option value="1">1-смена</option><option value="2">2-смена</option></select>
+  <span class="lang"><button onclick="switchLang('ru')">РУС</button> <button onclick="switchLang('kg')">КЫР</button></span>
+ </div>
+</div>
+<div class="tabs">
+ <button id="b-day" class="on" onclick="tab('day')" data-t="tDay">📊 День</button>
+ <button id="b-week" onclick="tab('week')" data-t="tWeek">🏆 Неделя</button>
+ <button id="b-cls" onclick="tab('cls')" data-t="tCls">⚙️ Классы</button>
+</div>
 
-<div class="container">
-    <header>
-        <h2 id="app-title">Панель директора</h2>
-        <div class="lang-switch">
-            <button onclick="switchLang('ru')">РУС</button>
-            <button onclick="switchLang('kg')">КЫР</button>
-        </div>
-    </header>
+<!-- ДЕНЬ -->
+<section id="p-day" class="panel on">
+<div class="card">
+ <div class="ptitle" id="pt-day"></div>
+ <div class="ctl">
+  <label data-t="date">Дата:</label><input type="date" id="dday" onchange="renderAll()">
+  <button class="btn s" onclick="renderAll()" data-t="refresh">Обновить</button>
+  <button class="btn g" onclick="window.print()" data-t="print">🖨 Печать</button>
+ </div>
+ <div class="tr"><table>
+  <thead><tr><th>№</th><th data-t="cls">Класс</th><th data-t="teacher">Руководитель</th><th data-t="tot">Всего</th><th data-t="l1">1-урок</th><th data-t="l2">2-урок</th><th data-t="late">Опоздали</th><th data-t="latep">Опазд. %</th><th data-t="l6">6-урок</th><th data-t="esc">Сбежали</th><th data-t="rate">Посещ. %</th></tr></thead>
+  <tbody id="d-body"></tbody><tfoot><tr class="tot" id="d-tot"></tr></tfoot>
+ </table></div>
+ <p class="note" id="d-note"></p>
+</div>
+</section>
 
-    <!-- 1. Отчёт -->
-    <div class="card">
-        <h3 id="h-report">Отчет посещаемости</h3>
-        <div class="controls">
-            <div>
-                <label id="lbl-date-filter" style="font-weight:600; font-size:14px;">Дата:</label>
-                <input type="date" id="filter-date" onchange="renderAll()">
-            </div>
-            <div>
-                <label id="lbl-shift-filter" style="font-weight:600; font-size:14px;">Смена:</label>
-                <select id="filter-shift" onchange="renderAll()">
-                    <option value="1">1-смена</option>
-                    <option value="2">2-смена</option>
-                </select>
-            </div>
-            <button class="btn-refresh" onclick="renderAll()" id="btn-refresh">Обновить данные</button>
-            <span class="status" id="status">●</span>
-        </div>
+<!-- НЕДЕЛЯ -->
+<section id="p-week" class="panel">
+<div class="card">
+ <div class="ptitle" id="pt-week"></div>
+ <div class="ctl">
+  <label data-t="anyDate">Любая дата недели:</label><input type="date" id="dweek" onchange="renderAll()">
+  <button class="btn s" onclick="shiftWeek(-7)" data-t="prev">← Пред.</button>
+  <button class="btn s" onclick="shiftWeek(7)" data-t="next">След. →</button>
+  <button class="btn g" onclick="window.print()" data-t="print">🖨 Печать</button>
+ </div>
+ <h2 id="wrange" style="margin:0 0 12px"></h2>
+ <div class="kpis" id="kpis"></div>
+ <div class="sec" data-t="best">🏆 ТОП-3 лучших классов</div><div class="grid" id="g-best"></div>
+ <div class="sec" data-t="worst">⚠️ ТОП-3 худших классов</div><div class="grid" id="g-worst"></div>
+ <div class="sec" data-t="mlate">⏰ Больше всех опоздали</div><div class="grid" id="g-late"></div>
+ <div class="sec" data-t="mesc">🏃 Больше всех сбежали</div><div class="grid" id="g-esc"></div>
+ <div class="sec" data-t="detail">Подробно по классам</div>
+ <div class="tr"><table><thead id="w-head"></thead><tbody id="w-body"></tbody><tfoot><tr class="tot" id="w-tot"></tr></tfoot></table></div>
+ <p class="note" data-t="wnote">Посещаемость за день = 2-урок / всего учеников. Воскресенье не учитывается.</p>
+</div>
+</section>
 
-        <div class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th>№</th>
-                        <th id="th-class">Классы</th>
-                        <th id="th-total">Общ кол-во уч</th>
-                        <th id="th-l1">1-урок</th>
-                        <th id="th-l2">2-урок</th>
-                        <th id="th-late">Кол-во опазд. уч</th>
-                        <th id="th-late-p">Опазд. уч в %</th>
-                        <th id="th-l6">6-урок</th>
-                        <th id="th-escaped">Кол-во сбежав. уч</th>
-                        <th id="th-rate">Посещаемость %</th>
-                    </tr>
-                </thead>
-                <tbody id="table-body"></tbody>
-                <tfoot>
-                    <tr class="total-row" id="table-total"></tr>
-                </tfoot>
-            </table>
-        </div>
-        <p class="note" id="report-note"></p>
-    </div>
-
-    <!-- 2. Классы и количество учеников -->
-    <div class="card">
-        <h3 id="h-manage">Классы и количество учеников</h3>
-
-        <div class="add-form">
-            <div>
-                <label id="lbl-add-shift">Смена</label>
-                <select id="add-shift">
-                    <option value="1">1-смена</option>
-                    <option value="2">2-смена</option>
-                </select>
-            </div>
-            <div>
-                <label id="lbl-add-class">Класс</label>
-                <input type="text" id="add-class" placeholder="7-А" style="width:100px;">
-            </div>
-            <div>
-                <label id="lbl-add-total">Кол-во учеников</label>
-                <input type="number" id="add-total" placeholder="30" min="1" style="width:110px;">
-            </div>
-            <button class="btn-add" onclick="addClass()" id="btn-add">Добавить класс</button>
-        </div>
-
-        <p class="note" id="manage-note"></p>
-
-        <div class="table-responsive" style="margin-top:15px;">
-            <table>
-                <thead>
-                    <tr>
-                        <th>№</th>
-                        <th id="th-m-class">Класс</th>
-                        <th id="th-m-total">Кол-во учеников</th>
-                        <th id="th-m-del"></th>
-                    </tr>
-                </thead>
-                <tbody id="manage-body"></tbody>
-            </table>
-        </div>
-    </div>
+<!-- КЛАССЫ -->
+<section id="p-cls" class="panel">
+<div class="card">
+ <h3 data-t="manage">Классы, руководители и количество учеников</h3>
+ <div class="ctl">
+  <select id="a-shift"><option value="1">1-смена</option><option value="2">2-смена</option></select>
+  <input id="a-cls" placeholder="7-А" style="width:90px">
+  <input id="a-teacher" data-p="teacherPh" placeholder="Руководитель" style="width:190px">
+  <input id="a-total" type="number" min="1" placeholder="30" style="width:90px">
+  <button class="btn g" onclick="addClass()" data-t="add">Добавить класс</button>
+ </div>
+ <p class="note" data-t="mnote">Показаны классы выбранной смены. Если класс уже есть, он обновится.</p>
+ <div class="tr"><table>
+  <thead><tr><th>№</th><th data-t="cls">Класс</th><th data-t="teacher">Руководитель</th><th data-t="tot">Всего</th><th></th></tr></thead>
+  <tbody id="m-body"></tbody>
+ </table></div>
+</div>
+</section>
 </div>
 
 <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+const db = getFirestore(initializeApp({ projectId: "qr-code-hujamov" }));
 
-    const firebaseConfig = {
-        projectId: "qr-code-hujamov"
-    };
+const T = {
+ru:{title:"Панель директора",tDay:"📊 День",tWeek:"🏆 Неделя",tCls:"⚙️ Классы",date:"Дата:",refresh:"Обновить",print:"🖨 Печать",cls:"Класс",teacher:"Руководитель",tot:"Всего",l1:"1-урок",l2:"2-урок",late:"Опоздали",latep:"Опазд. %",l6:"6-урок",esc:"Сбежали",rate:"Посещ. %",anyDate:"Любая дата недели:",prev:"← Пред.",next:"След. →",best:"🏆 ТОП-3 лучших классов",worst:"⚠️ ТОП-3 худших классов",mlate:"⏰ Больше всех опоздали",mesc:"🏃 Больше всех сбежали",detail:"Подробно по классам",wnote:"Посещаемость за день = 2-урок / всего учеников. Воскресенье не учитывается.",manage:"Классы, руководители и количество учеников",add:"Добавить класс",mnote:"Показаны классы выбранной смены. Если класс уже есть, он обновится.",teacherPh:"Руководитель",sum:"Итого",notsent:"Ещё не отправили",online:"● Онлайн, данные обновляются сами",offline:"● Нет связи с базой",del:"Удалить",confirm:"Удалить класс",fill:"Введите класс и количество учеников",nocls:"В этой смене нет классов",avg:"Средн. %",days:"Дней",kAvg:"Средняя посещаемость",kLate:"Всего опозданий",kEsc:"Всего сбежавших",kCls:"Классов сдали",wk:"Недельный отчёт посещаемости",dy:"Дневной отчёт посещаемости",sh:"смена",lt:"опозд.",es:"сбеж.",noData:"Нет данных",dn:["Пн","Вт","Ср","Чт","Пт","Сб"],pending:"Не сдали: "},
+kg:{title:"Директор панели",tDay:"📊 Күн",tWeek:"🏆 Жума",tCls:"⚙️ Класстар",date:"Күнү:",refresh:"Жаңыртуу",print:"🖨 Басып чыгаруу",cls:"Класс",teacher:"Жетекчи",tot:"Жалпы",l1:"1-сабак",l2:"2-сабак",late:"Кечиккен",latep:"Кечигүү %",l6:"6-сабак",esc:"Качкан",rate:"Катышуу %",anyDate:"Жуманын каалаган күнү:",prev:"← Мурунку",next:"Кийинки →",best:"🏆 ТОП-3 мыкты класс",worst:"⚠️ ТОП-3 начар класс",mlate:"⏰ Эң көп кечиккендер",mesc:"🏃 Эң көп качкандар",detail:"Класстар боюнча толук",wnote:"Бир күндүк катышуу = 2-сабак / жалпы окуучу. Жекшемби эсептелбейт.",manage:"Класстар, жетекчилер жана окуучулардын саны",add:"Класс кошуу",mnote:"Тандалган нөөмөттүн класстары көрсөтүлгөн. Класс бар болсо, жаңыланат.",teacherPh:"Жетекчи",sum:"Жыйынтык",notsent:"Дагы жөнөткөн жок",online:"● Онлайн, маалымат өзү жаңырат",offline:"● Базага байланыш жок",del:"Өчүрүү",confirm:"Классты өчүрүү",fill:"Класс жана окуучулардын санын киргизиңиз",nocls:"Бул нөөмөттө класс жок",avg:"Орточо %",days:"Күн",kAvg:"Орточо катышуу",kLate:"Бардык кечигүү",kEsc:"Бардык качкан",kCls:"Берген класстар",wk:"Жумалык катышуу отчёту",dy:"Күндүк катышуу отчёту",sh:"нөөмөт",lt:"кечикти",es:"качты",noData:"Маалымат жок",dn:["Дүй","Шей","Шар","Бей","Жум","Ишм"],pending:"Бере элек: "}
+};
+let L='ru', classes=[], att=[], online=true;
+const $=id=>document.getElementById(id), t=k=>T[L][k];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const today=()=>fmt(new Date());
+const lat={A:'А',B:'В',C:'С',E:'Е',H:'Н',K:'К',M:'М',O:'О',P:'Р',T:'Т',X:'Х'};
+const norm=s=>s.trim().toUpperCase().replace(/[^0-9\p{L}\-]/gu,'').split('').map(c=>lat[c]||c).join('');
+const byCls=(a,b)=>String(a.className).localeCompare(String(b.className),undefined,{numeric:true});
+const pct=(a,b)=>b>0?Math.round(a/b*100):0;
+const id=c=>`${c.shift}_${c.className}`;
+$('dday').value=today(); $('dweek').value=today();
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+window.tab=n=>{['day','week','cls'].forEach(x=>{$('p-'+x).classList.toggle('on',x===n);$('b-'+x).classList.toggle('on',x===n)})};
 
-    const translations = {
-        ru: {
-            appTitle: "Панель директора",
-            hReport: "Отчет посещаемости",
-            lblDateFilter: "Дата:",
-            lblShiftFilter: "Смена:",
-            btnRefresh: "Обновить данные",
-            thClass: "Классы",
-            thTotal: "Общ кол-во уч",
-            thL1: "1-урок",
-            thL2: "2-урок",
-            thLate: "Кол-во опазд. уч",
-            thLateP: "Опазд. уч в %",
-            thL6: "6-урок",
-            thEscaped: "Кол-во сбежав. уч",
-            thRate: "Посещаемость %",
-            totalText: "Итого",
-            online: "● Онлайн (данные обновляются сами)",
-            offline: "● Нет связи с базой",
-            notSent: "Ещё не отправили данные",
-            noClassesReport: "Классы ещё не добавлены. Добавьте их ниже в разделе «Классы и количество учеников».",
-            hManage: "Классы и количество учеников",
-            lblAddShift: "Смена",
-            lblAddClass: "Класс",
-            lblAddTotal: "Кол-во учеников",
-            btnAdd: "Добавить класс",
-            thMClass: "Класс",
-            thMTotal: "Кол-во учеников",
-            manageNote: "Показаны классы выбранной смены. Если класс уже есть, он обновится.",
-            del: "Удалить",
-            confirmDel: "Удалить класс",
-            fillAll: "Введите название класса и количество учеников",
-            noManage: "В этой смене пока нет классов"
-        },
-        kg: {
-            appTitle: "Директор панели",
-            hReport: "Катышуу отчёту",
-            lblDateFilter: "Күнү:",
-            lblShiftFilter: "Нөөмөт:",
-            btnRefresh: "Жаңыртуу",
-            thClass: "Класстар",
-            thTotal: "Жалпы окуучу",
-            thL1: "1-сабак",
-            thL2: "2-сабак",
-            thLate: "Кечиккендер",
-            thLateP: "Кечигүү %",
-            thL6: "6-сабак",
-            thEscaped: "Качып кеткендер",
-            thRate: "Катышуу %",
-            totalText: "Жыйынтык",
-            online: "● Онлайн (маалымат өзү жаңырат)",
-            offline: "● Базага байланыш жок",
-            notSent: "Маалымат дагы жөнөтө элек",
-            noClassesReport: "Класстар кошула элек. Төмөндө «Класстар жана окуучулардын саны» бөлүмүнөн кошуңуз.",
-            hManage: "Класстар жана окуучулардын саны",
-            lblAddShift: "Нөөмөт",
-            lblAddClass: "Класс",
-            lblAddTotal: "Окуучулардын саны",
-            btnAdd: "Класс кошуу",
-            thMClass: "Класс",
-            thMTotal: "Окуучулардын саны",
-            manageNote: "Тандалган нөөмөттүн класстары көрсөтүлгөн. Класс бар болсо, жаңыланат.",
-            del: "Өчүрүү",
-            confirmDel: "Классты өчүрүү",
-            fillAll: "Класстын атын жана окуучулардын санын киргизиңиз",
-            noManage: "Бул нөөмөттө класстар жок"
-        }
-    };
+window.switchLang=l=>{L=l;
+ document.querySelectorAll('[data-t]').forEach(e=>e.innerText=t(e.dataset.t));
+ document.querySelectorAll('[data-p]').forEach(e=>e.placeholder=t(e.dataset.p));
+ setStatus(online); renderAll()};
+function setStatus(o){online=o;const s=$('status');s.innerText=t(o?'online':'offline');s.className='st'+(o?'':' off')}
 
-    let currentLang = 'ru';
-    let classesData = [];
-    let attendanceData = [];
-    let statusOnline = true;
+onSnapshot(collection(db,"classes"),s=>{classes=[];s.forEach(d=>classes.push(d.data()));setStatus(true);renderAll()},e=>{console.error(e);setStatus(false)});
+onSnapshot(collection(db,"attendance"),s=>{att=[];s.forEach(d=>att.push(d.data()));setStatus(true);renderAll()},e=>{console.error(e);setStatus(false)});
 
-    const el = (id) => document.getElementById(id);
+// ---- Классы: қўшиш/ўзгартириш (merge: руководитель ва бошқа маълумот ўчмайди) ----
+async function save(i,data){try{await setDoc(doc(db,"classes",i),data,{merge:true})}catch(e){alert("Xatolik: "+e.message)}}
+window.addClass=async()=>{
+ const shift=$('a-shift').value,className=norm($('a-cls').value),total=parseInt($('a-total').value),teacher=$('a-teacher').value.trim();
+ if(!className||!total||total<1){alert(t('fill'));return}
+ const d={shift,className,total}; if(teacher)d.teacher=teacher;
+ await save(`${shift}_${className}`,d);
+ $('a-cls').value='';$('a-total').value='';$('a-teacher').value='';$('shift').value=shift;renderAll()};
+window.setTotal=(i,v)=>{const c=classes.find(x=>id(x)===i);if(c)save(i,{total:Math.max(1,parseInt(v)||1)})};
+window.chTotal=(i,d)=>{const c=classes.find(x=>id(x)===i);if(c)setTotal(i,c.total+d)};
+window.setTeacher=(i,v)=>save(i,{teacher:v.trim()});
+window.delClass=async i=>{const c=classes.find(x=>id(x)===i);if(!c||!confirm(`${t('confirm')} ${c.className}?`))return;
+ try{await deleteDoc(doc(db,"classes",i))}catch(e){alert("Xatolik: "+e.message)}};
 
-    function todayStr() {
-        const d = new Date();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${d.getFullYear()}-${m}-${day}`;
-    }
-    el('filter-date').value = todayStr();
+window.shiftWeek=d=>{const [y,m,dd]=($('dweek').value||today()).split('-').map(Number);$('dweek').value=fmt(new Date(y,m-1,dd+d));renderAll()};
 
-    // Лотин ҳарфларини кирилл кўринишдошларига алмаштириш, фақат ҳарф/рақам/дефис
-    const latinToCyr = { A:'А', B:'В', C:'С', E:'Е', H:'Н', K:'К', M:'М', O:'О', P:'Р', T:'Т', X:'Х' };
-    function normalizeClass(str) {
-        return str.trim().toUpperCase()
-            .replace(/[^0-9\p{L}\-]/gu, '')
-            .split('').map(ch => latinToCyr[ch] || ch).join('');
-    }
+window.renderAll=()=>{renderDay();renderWeek();renderManage()};
 
-    function sortByClass(a, b) {
-        return String(a.className).localeCompare(String(b.className), undefined, { numeric: true });
-    }
+function renderManage(){
+ const list=classes.filter(c=>c.shift===$('shift').value).sort(byCls);
+ $('m-body').innerHTML=list.length?list.map((c,n)=>{const i=id(c);return `<tr><td>${n+1}</td><td><b>${esc(c.className)}</b></td>
+ <td><input style="width:100%;min-width:150px" value="${esc(c.teacher)}" onchange="setTeacher('${i}',this.value)"></td>
+ <td><div class="mr"><button class="sm" onclick="chTotal('${i}',-1)">−</button><input type="number" min="1" value="${c.total}" onchange="setTotal('${i}',this.value)"><button class="sm" onclick="chTotal('${i}',1)">+</button></div></td>
+ <td><button class="btn r" onclick="delClass('${i}')">${t('del')}</button></td></tr>`}).join(''):`<tr><td colspan="5" class="mu">${t('nocls')}</td></tr>`}
 
-    function esc(s) {
-        return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    }
+function renderDay(){
+ const sh=$('shift').value,date=$('dday').value||today();
+ $('pt-day').innerText=`${t('dy')}: ${date}, ${sh}-${t('sh')}`;
+ const list=classes.filter(c=>c.shift===sh).sort(byCls);
+ let S={tot:0,l1:0,l2:0,late:0,l6:0,esc:0},miss=[],h='';
+ list.forEach((c,n)=>{
+  const a=att.find(x=>x.date===date&&x.shift===sh&&x.className===c.className);
+  const head=`<td>${n+1}</td><td><b>${esc(c.className)}</b></td><td>${esc(c.teacher)||'—'}</td><td>${c.total}</td>`;
+  if(!a){miss.push(c.className);h+=`<tr>${head}<td class="mu" colspan="7">${t('notsent')}</td></tr>`;return}
+  const l1=a.l1||0,l2=a.l2||0,l6=a.l6||0,late=Math.max(0,l2-l1),esc_=Math.max(0,l2-l6);
+  S.tot+=c.total;S.l1+=l1;S.l2+=l2;S.late+=late;S.l6+=l6;S.esc+=esc_;
+  h+=`<tr>${head}<td>${l1}</td><td>${l2}</td><td>${late}</td><td>${pct(late,c.total)}%</td><td>${l6}</td><td>${esc_}</td><td><b>${pct(l2,c.total)}%</b></td></tr>`});
+ $('d-body').innerHTML=h||`<tr><td colspan="11" class="mu">${t('nocls')}</td></tr>`;
+ $('d-tot').innerHTML=`<td colspan="3">${t('sum')}:</td><td>${S.tot}</td><td>${S.l1}</td><td>${S.l2}</td><td>${S.late}</td><td>${pct(S.late,S.tot)}%</td><td>${S.l6}</td><td>${S.esc}</td><td>${pct(S.l2,S.tot)}%</td>`;
+ $('d-note').innerText=miss.length?t('pending')+miss.join(', '):'';
+}
 
-    // ---------- Тил ----------
-    window.switchLang = function(lang) {
-        currentLang = lang;
-        const t = translations[lang];
-        el('app-title').innerText = t.appTitle;
-        el('h-report').innerText = t.hReport;
-        el('lbl-date-filter').innerText = t.lblDateFilter;
-        el('lbl-shift-filter').innerText = t.lblShiftFilter;
-        el('btn-refresh').innerText = t.btnRefresh;
-        el('th-class').innerText = t.thClass;
-        el('th-total').innerText = t.thTotal;
-        el('th-l1').innerText = t.thL1;
-        el('th-l2').innerText = t.thL2;
-        el('th-late').innerText = t.thLate;
-        el('th-late-p').innerText = t.thLateP;
-        el('th-l6').innerText = t.thL6;
-        el('th-escaped').innerText = t.thEscaped;
-        el('th-rate').innerText = t.thRate;
-        el('h-manage').innerText = t.hManage;
-        el('lbl-add-shift').innerText = t.lblAddShift;
-        el('lbl-add-class').innerText = t.lblAddClass;
-        el('lbl-add-total').innerText = t.lblAddTotal;
-        el('btn-add').innerText = t.btnAdd;
-        el('th-m-class').innerText = t.thMClass;
-        el('th-m-total').innerText = t.thMTotal;
-        el('manage-note').innerText = t.manageNote;
-        setStatus(statusOnline);
-        renderAll();
-    };
+function card(cls,medal,r,big,sub){
+ const w=Math.max(0,Math.min(100,r.avg));
+ return `<div class="pc ${cls}"><div class="m">${medal}</div><div class="cn">${esc(r.c.className)}</div><div class="tc">${r.c.teacher?'👤 '+esc(r.c.teacher):''}</div><div class="big">${big}</div><div class="sub">${sub}</div><div class="bar"><i style="width:${w}%"></i></div></div>`}
 
-    function setStatus(online) {
-        statusOnline = online;
-        const s = el('status');
-        s.innerText = translations[currentLang][online ? 'online' : 'offline'];
-        s.className = 'status' + (online ? '' : ' offline');
-    }
-
-    // ---------- Real-time ----------
-    onSnapshot(collection(db, "classes"), (snap) => {
-        classesData = [];
-        snap.forEach(d => classesData.push(d.data()));
-        setStatus(true);
-        renderAll();
-    }, (err) => { console.error(err); setStatus(false); });
-
-    onSnapshot(collection(db, "attendance"), (snap) => {
-        attendanceData = [];
-        snap.forEach(d => attendanceData.push(d.data()));
-        setStatus(true);
-        renderAll();
-    }, (err) => { console.error(err); setStatus(false); });
-
-    // ---------- Класс қўшиш / ўзгартириш / ўчириш ----------
-    window.addClass = async function() {
-        const shift = el('add-shift').value;
-        const className = normalizeClass(el('add-class').value);
-        const total = parseInt(el('add-total').value);
-        if (!className || !total || total < 1) {
-            alert(translations[currentLang].fillAll);
-            return;
-        }
-        try {
-            await setDoc(doc(db, "classes", `${shift}_${className}`), { shift, className, total });
-            el('add-class').value = '';
-            el('add-total').value = '';
-            el('filter-shift').value = shift;
-            renderAll();
-        } catch (e) {
-            alert("Xatolik: " + e.message);
-        }
-    };
-
-    window.setTotal = async function(id, value) {
-        const total = Math.max(1, parseInt(value) || 1);
-        const cls = classesData.find(c => `${c.shift}_${c.className}` === id);
-        if (!cls) return;
-        try {
-            await setDoc(doc(db, "classes", id), { shift: cls.shift, className: cls.className, total });
-        } catch (e) {
-            alert("Xatolik: " + e.message);
-        }
-    };
-
-    window.changeTotal = function(id, delta) {
-        const cls = classesData.find(c => `${c.shift}_${c.className}` === id);
-        if (!cls) return;
-        window.setTotal(id, cls.total + delta);
-    };
-
-    window.removeClass = async function(id) {
-        const cls = classesData.find(c => `${c.shift}_${c.className}` === id);
-        if (!cls) return;
-        if (!confirm(`${translations[currentLang].confirmDel} ${cls.className}?`)) return;
-        try {
-            await deleteDoc(doc(db, "classes", id));
-        } catch (e) {
-            alert("Xatolik: " + e.message);
-        }
-    };
-
-    // ---------- Чизиш ----------
-    window.renderAll = function() {
-        renderReport();
-        renderManage();
-    };
-
-    function renderManage() {
-        const t = translations[currentLang];
-        const shift = el('filter-shift').value;
-        const body = el('manage-body');
-        const list = classesData.filter(c => c.shift === shift).sort(sortByClass);
-
-        if (list.length === 0) {
-            body.innerHTML = `<tr><td colspan="4" class="muted">${t.noManage}</td></tr>`;
-            return;
-        }
-
-        body.innerHTML = list.map((c, i) => {
-            const id = `${c.shift}_${c.className}`;
-            return `
-            <tr>
-                <td>${i + 1}</td>
-                <td><strong>${esc(c.className)}</strong></td>
-                <td>
-                    <div class="manage-row">
-                        <button class="btn-small" onclick="changeTotal('${id}', -1)">−</button>
-                        <input type="number" min="1" value="${c.total}" onchange="setTotal('${id}', this.value)">
-                        <button class="btn-small" onclick="changeTotal('${id}', 1)">+</button>
-                    </div>
-                </td>
-                <td><button class="btn-del" onclick="removeClass('${id}')">${t.del}</button></td>
-            </tr>`;
-        }).join('');
-    }
-
-    function renderReport() {
-        const t = translations[currentLang];
-        const shift = el('filter-shift').value;
-        const date = el('filter-date').value || todayStr();
-        const tbody = el('table-body');
-        const tfoot = el('table-total');
-        tbody.innerHTML = '';
-
-        const list = classesData.filter(c => c.shift === shift).sort(sortByClass);
-
-        let sumTotal = 0, sumL1 = 0, sumL2 = 0, sumLate = 0, sumL6 = 0, sumEscaped = 0;
-        let notSent = [];
-        let index = 1;
-
-        list.forEach(c => {
-            const att = attendanceData.find(a => a.date === date && a.shift === shift && a.className === c.className);
-            const tr = document.createElement('tr');
-
-            if (!att) {
-                notSent.push(c.className);
-                tr.innerHTML = `
-                    <td>${index++}</td>
-                    <td><strong>${esc(c.className)}</strong></td>
-                    <td>${c.total}</td>
-                    <td class="muted" colspan="7">${t.notSent}</td>`;
-                tbody.appendChild(tr);
-                return;
-            }
-
-            const total = c.total || 0;
-            const l1 = att.l1 || 0;
-            const l2 = att.l2 || 0;
-            const l6 = att.l6 || 0;
-
-            const late = Math.max(0, l2 - l1);
-            const latePercent = total > 0 ? Math.round((late / total) * 100) : 0;
-            const escaped = Math.max(0, l2 - l6);
-            const rate = total > 0 ? Math.round((l2 / total) * 100) : 0;
-
-            sumTotal += total;
-            sumL1 += l1;
-            sumL2 += l2;
-            sumLate += late;
-            sumL6 += l6;
-            sumEscaped += escaped;
-
-            tr.innerHTML = `
-                <td>${index++}</td>
-                <td><strong>${esc(c.className)}</strong></td>
-                <td>${total}</td>
-                <td>${l1}</td>
-                <td>${l2}</td>
-                <td>${late}</td>
-                <td>${latePercent}%</td>
-                <td>${l6}</td>
-                <td>${escaped}</td>
-                <td><strong>${rate}%</strong></td>`;
-            tbody.appendChild(tr);
-        });
-
-        const totalLatePercent = sumTotal > 0 ? Math.round((sumLate / sumTotal) * 100) : 0;
-        const totalRatePercent = sumTotal > 0 ? Math.round((sumL2 / sumTotal) * 100) : 0;
-
-        tfoot.innerHTML = `
-            <td colspan="2">${t.totalText}:</td>
-            <td>${sumTotal}</td>
-            <td>${sumL1}</td>
-            <td>${sumL2}</td>
-            <td>${sumLate}</td>
-            <td>${totalLatePercent}%</td>
-            <td>${sumL6}</td>
-            <td>${sumEscaped}</td>
-            <td>${totalRatePercent}%</td>`;
-
-        const note = el('report-note');
-        if (list.length === 0) {
-            note.innerText = t.noClassesReport;
-        } else if (notSent.length > 0) {
-            note.innerText = `${t.notSent}: ${notSent.join(', ')}`;
-        } else {
-            note.innerText = '';
-        }
-    }
-
-    switchLang('ru');
+function renderWeek(){
+ const sh=$('shift').value,[y,m,d]=($('dweek').value||today()).split('-').map(Number),b=new Date(y,m-1,d);
+ const mon=new Date(y,m-1,d-((b.getDay()+6)%7)),dates=[0,1,2,3,4,5].map(i=>new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()+i)),ds=dates.map(fmt);
+ const sd=x=>`${String(x.getDate()).padStart(2,'0')}.${String(x.getMonth()+1).padStart(2,'0')}`;
+ const range=`${sd(dates[0])} – ${sd(dates[5])}.${dates[5].getFullYear()}`;
+ $('wrange').innerText=`${range} · ${sh}-${t('sh')}`;
+ $('pt-week').innerText=`${t('wk')}: ${range}, ${sh}-${t('sh')}`;
+ const list=classes.filter(c=>c.shift===sh).sort(byCls);
+ const dayL2=[0,0,0,0,0,0],dayT=[0,0,0,0,0,0];
+ const rows=list.map(c=>{let sp=0,dc=0,late=0,es=0;
+  const cells=ds.map((s,i)=>{const a=att.find(x=>x.date===s&&x.shift===sh&&x.className===c.className);if(!a)return null;
+   const l1=a.l1||0,l2=a.l2||0,l6=a.l6||0,p=pct(l2,c.total);sp+=p;dc++;late+=Math.max(0,l2-l1);es+=Math.max(0,l2-l6);dayL2[i]+=l2;dayT[i]+=c.total;return p});
+  return {c,cells,avg:dc?Math.round(sp/dc):null,late,es,dc,latePct:pct(late,c.total*dc),escPct:pct(es,c.total*dc)}});
+ const ok=rows.filter(r=>r.dc>0);
+ const ranked=[...ok].sort((a,b)=>b.avg-a.avg||byCls(a.c,b.c));
+ const best=ranked.slice(0,3),worst=ranked.slice(3).reverse().slice(0,3);
+ const med=['🥇','🥈','🥉'],cl=['c1','c2','c3'];
+ const none=`<div class="note">${t('noData')}</div>`;
+ $('g-best').innerHTML=best.length?best.map((r,i)=>card(cl[i],med[i],r,r.avg+'%',`${t('days')}: ${r.dc}`)).join(''):none;
+ $('g-worst').innerHTML=worst.length?worst.map((r,i)=>card('w','⚠️',r,r.avg+'%',`${t('days')}: ${r.dc}`)).join(''):none;
+ const topBy=k=>[...ok].filter(r=>r[k]>0).sort((a,b)=>b[k]-a[k]||byCls(a.c,b.c)).slice(0,3);
+ const lt=topBy('late'),ec=topBy('es');
+ $('g-late').innerHTML=lt.length?lt.map((r,i)=>card('l',med[i],r,r.late,`${t('lt')} · ${r.latePct}%`)).join(''):none;
+ $('g-esc').innerHTML=ec.length?ec.map((r,i)=>card('e',med[i],r,r.es,`${t('es')} · ${r.escPct}%`)).join(''):none;
+ const aL2=dayL2.reduce((a,b)=>a+b,0),aT=dayT.reduce((a,b)=>a+b,0),aLate=rows.reduce((a,r)=>a+r.late,0),aEs=rows.reduce((a,r)=>a+r.es,0);
+ $('kpis').innerHTML=[[aT?pct(aL2,aT)+'%':'—',t('kAvg'),'#4f46e5'],[aLate,t('kLate'),'#ea580c'],[aEs,t('kEsc'),'#7c3aed'],[`${ok.length}/${rows.length}`,t('kCls'),'#16a34a']].map(k=>`<div class="kpi" style="border-color:${k[2]}"><b>${k[0]}</b><span>${k[1]}</span></div>`).join('');
+ $('w-head').innerHTML=`<tr><th>№</th><th>${t('cls')}</th><th>${t('teacher')}</th><th>${t('tot')}</th>${dates.map((x,i)=>`<th>${t('dn')[i]}<br><small>${sd(x)}</small></th>`).join('')}<th>${t('avg')}</th><th>${t('late')}</th><th>${t('esc')}</th><th>${t('days')}</th></tr>`;
+ $('w-body').innerHTML=rows.map((r,n)=>`<tr><td>${n+1}</td><td><b>${esc(r.c.className)}</b></td><td>${esc(r.c.teacher)||'—'}</td><td>${r.c.total}</td>${r.cells.map(p=>p===null?'<td class="mu">—</td>':`<td>${p}%</td>`).join('')}<td><b>${r.avg===null?'—':r.avg+'%'}</b></td><td>${r.late}</td><td>${r.es}</td><td>${r.dc}</td></tr>`).join('')||`<tr><td colspan="14" class="mu">${t('nocls')}</td></tr>`;
+ $('w-tot').innerHTML=`<td colspan="3">${t('sum')}:</td><td>${list.reduce((a,c)=>a+c.total,0)}</td>${dayL2.map((v,i)=>dayT[i]?`<td>${pct(v,dayT[i])}%</td>`:'<td class="mu">—</td>').join('')}<td>${aT?pct(aL2,aT)+'%':'—'}</td><td>${aLate}</td><td>${aEs}</td><td></td>`;
+}
+switchLang('ru');
 </script>
-
 </body>
 </html>
