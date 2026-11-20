@@ -46,6 +46,14 @@ tr:nth-child(even){background:#f8fafc}
 .mr{display:flex;align-items:center;justify-content:center;gap:5px}.mr input{width:64px;text-align:center}
 .sm{width:32px;height:32px;padding:0;background:#eef2f8;font-weight:700;cursor:pointer}
 .ptitle{display:none}
+.modal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:50;align-items:center;justify-content:center;padding:14px}
+.modal.on{display:flex}
+.mbox{background:#fff;border-radius:var(--r);padding:20px;width:100%;max-width:420px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.mbox h3{margin:0 0 4px}
+.mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+.mgrid label{font-size:12px;color:var(--mut);font-weight:600}
+.mgrid input{width:100%;margin-top:4px;text-align:center;font-size:18px}
+.ed{background:#eef2f8;border:0;cursor:pointer;font-weight:700;padding:6px 10px;border-radius:8px;white-space:nowrap}
 @media print{
 @page{size:A4 landscape;margin:10mm}
 body{background:#fff;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -78,14 +86,18 @@ body{background:#fff;padding:0;-webkit-print-color-adjust:exact;print-color-adju
  <div class="ptitle" id="pt-day"></div>
  <div class="ctl">
   <label data-t="date">Дата:</label><input type="date" id="dday" onchange="renderAll()">
+  <button class="btn s" onclick="shiftDay(-1)" data-t="prevDay">← День</button>
+  <button class="btn s" onclick="shiftDay(1)" data-t="nextDay">День →</button>
+  <button class="btn s" onclick="setToday()" data-t="todayBtn">Сегодня</button>
   <button class="btn s" onclick="renderAll()" data-t="refresh">Обновить</button>
   <button class="btn g" onclick="window.print()" data-t="print">🖨 Печать</button>
  </div>
  <div class="tr"><table>
-  <thead><tr><th>№</th><th data-t="cls">Класс</th><th data-t="teacher">Руководитель</th><th data-t="tot">Всего</th><th data-t="l1">1-урок</th><th data-t="l2">2-урок</th><th data-t="late">Опоздали</th><th data-t="latep">Опазд. %</th><th data-t="l6">6-урок</th><th data-t="esc">Сбежали</th><th data-t="rate">Посещ. %</th></tr></thead>
+  <thead><tr><th>№</th><th data-t="cls">Класс</th><th data-t="teacher">Руководитель</th><th data-t="tot">Всего</th><th data-t="l1">1-урок</th><th data-t="l2">2-урок</th><th data-t="late">Опоздали</th><th data-t="latep">Опазд. %</th><th data-t="l6">6-урок</th><th data-t="esc">Сбежали</th><th data-t="rate">Посещ. %</th><th class="noprint"></th></tr></thead>
   <tbody id="d-body"></tbody><tfoot><tr class="tot" id="d-tot"></tr></tfoot>
  </table></div>
  <p class="note" id="d-note"></p>
+ <p class="note noprint" data-t="dayHint">✏️ — изменить данные класса, ➕ — добавить пропущенный класс. Выберите нужную дату (вчера, сегодня) сверху.</p>
 </div>
 </section>
 
@@ -131,14 +143,29 @@ body{background:#fff;padding:0;-webkit-print-color-adjust:exact;print-color-adju
 </section>
 </div>
 
+<div class="modal" id="modal" onclick="if(event.target===this)closeEdit()"><div class="mbox">
+ <h3 id="m-title"></h3><div class="note" id="m-sub"></div>
+ <div class="mgrid">
+  <label><span data-t="l1">1-урок</span><input id="e-l1" type="number" min="0" inputmode="numeric"></label>
+  <label><span data-t="l2">2-урок</span><input id="e-l2" type="number" min="0" inputmode="numeric"></label>
+  <label><span data-t="l6">6-урок</span><input id="e-l6" type="number" min="0" inputmode="numeric"></label>
+ </div>
+ <p class="note" data-t="mhint">Оставьте поле пустым, если данных нет.</p>
+ <div class="ctl" style="margin:12px 0 0">
+  <button class="btn g" onclick="saveEdit()" data-t="save">Сохранить</button>
+  <button class="btn s" onclick="closeEdit()" data-t="cancel">Отмена</button>
+  <button class="btn r" id="m-del" onclick="delAtt()" data-t="delAtt">Удалить запись</button>
+ </div>
+</div></div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, deleteField } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 const db = getFirestore(initializeApp({ projectId: "qr-code-hujamov" }));
 
 const T = {
-ru:{title:"Панель директора",tDay:"📊 День",tWeek:"🏆 Неделя",tCls:"⚙️ Классы",date:"Дата:",refresh:"Обновить",print:"🖨 Печать",cls:"Класс",teacher:"Руководитель",tot:"Всего",l1:"1-урок",l2:"2-урок",late:"Опоздали",latep:"Опазд. %",l6:"6-урок",esc:"Сбежали",rate:"Посещ. %",anyDate:"Любая дата недели:",prev:"← Пред.",next:"След. →",best:"🏆 ТОП-3 лучших классов",worst:"⚠️ ТОП-3 худших классов",mlate:"⏰ Больше всех опоздали",mesc:"🏃 Больше всех сбежали",detail:"Подробно по классам",wnote:"Посещаемость за день = 2-урок / всего учеников. Воскресенье не учитывается.",manage:"Классы, руководители и количество учеников",add:"Добавить класс",mnote:"Показаны классы выбранной смены. Если класс уже есть, он обновится.",teacherPh:"Руководитель",sum:"Итого",notsent:"Ещё не отправили",online:"● Онлайн, данные обновляются сами",offline:"● Нет связи с базой",del:"Удалить",confirm:"Удалить класс",fill:"Введите класс и количество учеников",nocls:"В этой смене нет классов",avg:"Средн. %",days:"Дней",kAvg:"Средняя посещаемость",kLate:"Всего опозданий",kEsc:"Всего сбежавших",kCls:"Классов сдали",wk:"Недельный отчёт посещаемости",dy:"Дневной отчёт посещаемости",sh:"смена",lt:"опозд.",es:"сбеж.",noData:"Нет данных",dn:["Пн","Вт","Ср","Чт","Пт","Сб"],pending:"Не сдали: "},
-kg:{title:"Директор панели",tDay:"📊 Күн",tWeek:"🏆 Жума",tCls:"⚙️ Класстар",date:"Күнү:",refresh:"Жаңыртуу",print:"🖨 Басып чыгаруу",cls:"Класс",teacher:"Жетекчи",tot:"Жалпы",l1:"1-сабак",l2:"2-сабак",late:"Кечиккен",latep:"Кечигүү %",l6:"6-сабак",esc:"Качкан",rate:"Катышуу %",anyDate:"Жуманын каалаган күнү:",prev:"← Мурунку",next:"Кийинки →",best:"🏆 ТОП-3 мыкты класс",worst:"⚠️ ТОП-3 начар класс",mlate:"⏰ Эң көп кечиккендер",mesc:"🏃 Эң көп качкандар",detail:"Класстар боюнча толук",wnote:"Бир күндүк катышуу = 2-сабак / жалпы окуучу. Жекшемби эсептелбейт.",manage:"Класстар, жетекчилер жана окуучулардын саны",add:"Класс кошуу",mnote:"Тандалган нөөмөттүн класстары көрсөтүлгөн. Класс бар болсо, жаңыланат.",teacherPh:"Жетекчи",sum:"Жыйынтык",notsent:"Дагы жөнөткөн жок",online:"● Онлайн, маалымат өзү жаңырат",offline:"● Базага байланыш жок",del:"Өчүрүү",confirm:"Классты өчүрүү",fill:"Класс жана окуучулардын санын киргизиңиз",nocls:"Бул нөөмөттө класс жок",avg:"Орточо %",days:"Күн",kAvg:"Орточо катышуу",kLate:"Бардык кечигүү",kEsc:"Бардык качкан",kCls:"Берген класстар",wk:"Жумалык катышуу отчёту",dy:"Күндүк катышуу отчёту",sh:"нөөмөт",lt:"кечикти",es:"качты",noData:"Маалымат жок",dn:["Дүй","Шей","Шар","Бей","Жум","Ишм"],pending:"Бере элек: "}
+ru:{title:"Панель директора",tDay:"📊 День",tWeek:"🏆 Неделя",tCls:"⚙️ Классы",date:"Дата:",refresh:"Обновить",print:"🖨 Печать",cls:"Класс",teacher:"Руководитель",tot:"Всего",l1:"1-урок",l2:"2-урок",late:"Опоздали",latep:"Опазд. %",l6:"6-урок",esc:"Сбежали",rate:"Посещ. %",anyDate:"Любая дата недели:",prev:"← Пред.",next:"След. →",best:"🏆 ТОП-3 лучших классов",worst:"⚠️ ТОП-3 худших классов",mlate:"⏰ Больше всех опоздали",mesc:"🏃 Больше всех сбежали",detail:"Подробно по классам",wnote:"Посещаемость за день = 2-урок / всего учеников. Воскресенье не учитывается.",manage:"Классы, руководители и количество учеников",add:"Добавить класс",mnote:"Показаны классы выбранной смены. Если класс уже есть, он обновится.",teacherPh:"Руководитель",sum:"Итого",notsent:"Ещё не отправили",online:"● Онлайн, данные обновляются сами",offline:"● Нет связи с базой",del:"Удалить",confirm:"Удалить класс",fill:"Введите класс и количество учеников",nocls:"В этой смене нет классов",avg:"Средн. %",days:"Дней",kAvg:"Средняя посещаемость",kLate:"Всего опозданий",kEsc:"Всего сбежавших",kCls:"Классов сдали",wk:"Недельный отчёт посещаемости",dy:"Дневной отчёт посещаемости",sh:"смена",lt:"опозд.",es:"сбеж.",noData:"Нет данных",dn:["Пн","Вт","Ср","Чт","Пт","Сб"],pending:"Не сдали: ",prevDay:"← День",nextDay:"День →",todayBtn:"Сегодня",addAtt:"Добавить",save:"Сохранить",cancel:"Отмена",delAtt:"Удалить запись",mhint:"Оставьте поле пустым, если данных нет.",tooMany:"Число больше, чем учеников в классе",fillOne:"Введите хотя бы одно число",delConfirm:"Удалить запись посещаемости за этот день?",dayHint:"✏️ — изменить данные класса, ➕ — добавить пропущенный класс. Выберите нужную дату (вчера, сегодня) сверху."},
+kg:{title:"Директор панели",tDay:"📊 Күн",tWeek:"🏆 Жума",tCls:"⚙️ Класстар",date:"Күнү:",refresh:"Жаңыртуу",print:"🖨 Басып чыгаруу",cls:"Класс",teacher:"Жетекчи",tot:"Жалпы",l1:"1-сабак",l2:"2-сабак",late:"Кечиккен",latep:"Кечигүү %",l6:"6-сабак",esc:"Качкан",rate:"Катышуу %",anyDate:"Жуманын каалаган күнү:",prev:"← Мурунку",next:"Кийинки →",best:"🏆 ТОП-3 мыкты класс",worst:"⚠️ ТОП-3 начар класс",mlate:"⏰ Эң көп кечиккендер",mesc:"🏃 Эң көп качкандар",detail:"Класстар боюнча толук",wnote:"Бир күндүк катышуу = 2-сабак / жалпы окуучу. Жекшемби эсептелбейт.",manage:"Класстар, жетекчилер жана окуучулардын саны",add:"Класс кошуу",mnote:"Тандалган нөөмөттүн класстары көрсөтүлгөн. Класс бар болсо, жаңыланат.",teacherPh:"Жетекчи",sum:"Жыйынтык",notsent:"Дагы жөнөткөн жок",online:"● Онлайн, маалымат өзү жаңырат",offline:"● Базага байланыш жок",del:"Өчүрүү",confirm:"Классты өчүрүү",fill:"Класс жана окуучулардын санын киргизиңиз",nocls:"Бул нөөмөттө класс жок",avg:"Орточо %",days:"Күн",kAvg:"Орточо катышуу",kLate:"Бардык кечигүү",kEsc:"Бардык качкан",kCls:"Берген класстар",wk:"Жумалык катышуу отчёту",dy:"Күндүк катышуу отчёту",sh:"нөөмөт",lt:"кечикти",es:"качты",noData:"Маалымат жок",dn:["Дүй","Шей","Шар","Бей","Жум","Ишм"],pending:"Бере элек: ",prevDay:"← Күн",nextDay:"Күн →",todayBtn:"Бүгүн",addAtt:"Кошуу",save:"Сактоо",cancel:"Жокко чыгаруу",delAtt:"Жазууну өчүрүү",mhint:"Маалымат жок болсо, талааны бош калтырыңыз.",tooMany:"Сан класстагы окуучулардан көп",fillOne:"Жок дегенде бир санды киргизиңиз",delConfirm:"Бул күндүн катышуу жазуусун өчүрүү?",dayHint:"✏️ — класстын маалыматын өзгөртүү, ➕ — калып кеткен классты кошуу. Керектүү күндү (кечээ, бүгүн) жогортон тандаңыз."}
 };
 let L='ru', classes=[], att=[], online=true;
 const $=id=>document.getElementById(id), t=k=>T[L][k];
@@ -150,6 +177,10 @@ const norm=s=>s.trim().toUpperCase().replace(/[^0-9\p{L}\-]/gu,'').split('').map
 const byCls=(a,b)=>String(a.className).localeCompare(String(b.className),undefined,{numeric:true});
 const pct=(a,b)=>b>0?Math.round(a/b*100):0;
 const id=c=>`${c.shift}_${c.className}`;
+const nn=x=>(x===undefined||x===null)?null:x;
+const dash=x=>x===null?'<span class="mu">—</span>':x;
+function calc(a,total){const l1=nn(a.l1),l2=nn(a.l2),l6=nn(a.l6);
+ return {l1,l2,l6,late:(l1!==null&&l2!==null)?Math.max(0,l2-l1):null,esc:(l2!==null&&l6!==null)?Math.max(0,l2-l6):null,rate:l2!==null?pct(l2,total):null}}
 $('dday').value=today(); $('dweek').value=today();
 
 window.tab=n=>{['day','week','cls'].forEach(x=>{$('p-'+x).classList.toggle('on',x===n);$('b-'+x).classList.toggle('on',x===n)})};
@@ -179,6 +210,30 @@ window.delClass=async i=>{const c=classes.find(x=>id(x)===i);if(!c||!confirm(`${
 
 window.shiftWeek=d=>{const [y,m,dd]=($('dweek').value||today()).split('-').map(Number);$('dweek').value=fmt(new Date(y,m-1,dd+d));renderAll()};
 
+let ed=null;
+window.editAtt=i=>{const c=classes.find(x=>id(x)===i);if(!c)return;
+ const date=$('dday').value||today();
+ const a0=att.find(x=>x.date===date&&x.shift===c.shift&&x.className===c.className),a=a0||{};
+ ed={c,date,exists:!!a0};
+ ['l1','l2','l6'].forEach(k=>$('e-'+k).value=a[k]??'');
+ $('m-title').innerText=`${c.className} · ${c.shift}-${t('sh')} · ${date}`;
+ $('m-sub').innerText=`${t('tot')}: ${c.total}`;
+ $('m-del').style.display=a0?'':'none';
+ $('modal').classList.add('on')};
+window.closeEdit=()=>{$('modal').classList.remove('on');ed=null};
+window.saveEdit=async()=>{if(!ed)return;const {c,date}=ed;
+ const d={date,shift:c.shift,className:c.className,updatedAt:Date.now(),byDirector:true};let any=false;
+ for(const k of ['l1','l2','l6']){const raw=$('e-'+k).value.trim();
+  if(raw===''){d[k]=deleteField();continue}
+  const n=parseInt(raw);if(isNaN(n)||n<0||n>c.total){alert(`${t('tooMany')} (${c.total})`);return}
+  d[k]=n;any=true}
+ if(!any&&!ed.exists){alert(t('fillOne'));return}
+ try{await setDoc(doc(db,"attendance",`${date}_${c.shift}_${c.className}`),d,{merge:true});closeEdit()}catch(e){alert("Xatolik: "+e.message)}};
+window.delAtt=async()=>{if(!ed||!confirm(t('delConfirm')))return;const {c,date}=ed;
+ try{await deleteDoc(doc(db,"attendance",`${date}_${c.shift}_${c.className}`));closeEdit()}catch(e){alert("Xatolik: "+e.message)}};
+window.shiftDay=d=>{const [y,m,dd]=($('dday').value||today()).split('-').map(Number);$('dday').value=fmt(new Date(y,m-1,dd+d));renderAll()};
+window.setToday=()=>{$('dday').value=today();renderAll()};
+
 window.renderAll=()=>{renderDay();renderWeek();renderManage()};
 
 function renderManage(){
@@ -192,16 +247,17 @@ function renderDay(){
  const sh=$('shift').value,date=$('dday').value||today();
  $('pt-day').innerText=`${t('dy')}: ${date}, ${sh}-${t('sh')}`;
  const list=classes.filter(c=>c.shift===sh).sort(byCls);
- let S={tot:0,l1:0,l2:0,late:0,l6:0,esc:0},miss=[],h='';
+ let S={tot:0,t2:0,l1:0,l2:0,late:0,l6:0,esc:0},miss=[],h='';
  list.forEach((c,n)=>{
+  const i=id(c);
   const a=att.find(x=>x.date===date&&x.shift===sh&&x.className===c.className);
-  const head=`<td>${n+1}</td><td><b>${esc(c.className)}</b></td><td>${esc(c.teacher)||'—'}</td><td>${c.total}</td>`;
-  if(!a){miss.push(c.className);h+=`<tr>${head}<td class="mu" colspan="7">${t('notsent')}</td></tr>`;return}
-  const l1=a.l1||0,l2=a.l2||0,l6=a.l6||0,late=Math.max(0,l2-l1),esc_=Math.max(0,l2-l6);
-  S.tot+=c.total;S.l1+=l1;S.l2+=l2;S.late+=late;S.l6+=l6;S.esc+=esc_;
-  h+=`<tr>${head}<td>${l1}</td><td>${l2}</td><td>${late}</td><td>${pct(late,c.total)}%</td><td>${l6}</td><td>${esc_}</td><td><b>${pct(l2,c.total)}%</b></td></tr>`});
- $('d-body').innerHTML=h||`<tr><td colspan="11" class="mu">${t('nocls')}</td></tr>`;
- $('d-tot').innerHTML=`<td colspan="3">${t('sum')}:</td><td>${S.tot}</td><td>${S.l1}</td><td>${S.l2}</td><td>${S.late}</td><td>${pct(S.late,S.tot)}%</td><td>${S.l6}</td><td>${S.esc}</td><td>${pct(S.l2,S.tot)}%</td>`;
+  const head=`<td>${n+1}</td><td><b>${esc(c.className)}</b>${a&&a.byDirector?' ✎':''}</td><td>${esc(c.teacher)||'—'}</td><td>${c.total}</td>`;
+  if(!a){miss.push(c.className);h+=`<tr>${head}<td class="mu" colspan="7">${t('notsent')}</td><td class="noprint"><button class="ed" onclick="editAtt('${i}')">➕ ${t('addAtt')}</button></td></tr>`;return}
+  const k=calc(a,c.total);
+  S.tot+=c.total;S.l1+=k.l1||0;S.l2+=k.l2||0;S.l6+=k.l6||0;S.late+=k.late||0;S.esc+=k.esc||0;if(k.l2!==null)S.t2+=c.total;
+  h+=`<tr>${head}<td>${dash(k.l1)}</td><td>${dash(k.l2)}</td><td>${dash(k.late)}</td><td>${k.late===null?dash(null):pct(k.late,c.total)+'%'}</td><td>${dash(k.l6)}</td><td>${dash(k.esc)}</td><td><b>${k.rate===null?'—':k.rate+'%'}</b></td><td class="noprint"><button class="ed" onclick="editAtt('${i}')">✏️</button></td></tr>`});
+ $('d-body').innerHTML=h||`<tr><td colspan="12" class="mu">${t('nocls')}</td></tr>`;
+ $('d-tot').innerHTML=`<td colspan="3">${t('sum')}:</td><td>${S.tot}</td><td>${S.l1}</td><td>${S.l2}</td><td>${S.late}</td><td>${pct(S.late,S.tot)}%</td><td>${S.l6}</td><td>${S.esc}</td><td>${pct(S.l2,S.t2)}%</td><td class="noprint"></td>`;
  $('d-note').innerText=miss.length?t('pending')+miss.join(', '):'';
 }
 
@@ -218,11 +274,13 @@ function renderWeek(){
  $('pt-week').innerText=`${t('wk')}: ${range}, ${sh}-${t('sh')}`;
  const list=classes.filter(c=>c.shift===sh).sort(byCls);
  const dayL2=[0,0,0,0,0,0],dayT=[0,0,0,0,0,0];
- const rows=list.map(c=>{let sp=0,dc=0,late=0,es=0;
+ const rows=list.map(c=>{let sp=0,dc=0,rc=0,late=0,es=0;
   const cells=ds.map((s,i)=>{const a=att.find(x=>x.date===s&&x.shift===sh&&x.className===c.className);if(!a)return null;
-   const l1=a.l1||0,l2=a.l2||0,l6=a.l6||0,p=pct(l2,c.total);sp+=p;dc++;late+=Math.max(0,l2-l1);es+=Math.max(0,l2-l6);dayL2[i]+=l2;dayT[i]+=c.total;return p});
-  return {c,cells,avg:dc?Math.round(sp/dc):null,late,es,dc,latePct:pct(late,c.total*dc),escPct:pct(es,c.total*dc)}});
- const ok=rows.filter(r=>r.dc>0);
+   const k=calc(a,c.total);dc++;late+=k.late||0;es+=k.esc||0;
+   if(k.l2!==null){dayL2[i]+=k.l2;dayT[i]+=c.total}
+   if(k.rate===null)return null;sp+=k.rate;rc++;return k.rate});
+  return {c,cells,avg:rc?Math.round(sp/rc):null,late,es,dc,latePct:pct(late,c.total*dc),escPct:pct(es,c.total*dc)}});
+ const ok=rows.filter(r=>r.avg!==null);
  const ranked=[...ok].sort((a,b)=>b.avg-a.avg||byCls(a.c,b.c));
  const best=ranked.slice(0,3),worst=ranked.slice(3).reverse().slice(0,3);
  const med=['🥇','🥈','🥉'],cl=['c1','c2','c3'];
