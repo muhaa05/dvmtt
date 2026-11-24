@@ -93,6 +93,18 @@
             border-radius: 4px; padding: 10px 12px; font-size: 14px;
             margin-bottom: 15px; display: none; line-height: 1.5; font-weight: 600;
         }
+        .pending-line { background:#fff8e1; border:1px solid #ffe08a; color:#7a5b00; border-radius:4px; padding:10px 12px; font-size:14px; margin-bottom:15px; line-height:2; display:none; }
+        .pending-line.done { background:#e9f7ef; border-color:#a9dfbf; color:#1e8449; }
+        .chip { display:inline-block; background:#e74c3c; color:#fff; padding:3px 11px; border-radius:14px; font-weight:700; margin:2px 3px 2px 0; cursor:pointer; line-height:1.4; }
+        .status-card h3 { margin:0 0 4px; font-size:16px; }
+        .status-card .hint { font-size:12px; color:#888; margin-bottom:10px; }
+        .status-card table { width:100%; border-collapse:collapse; font-size:14px; }
+        .status-card th, .status-card td { border:1px solid #e3e6ea; padding:8px 4px; text-align:center; }
+        .status-card th { background:#2c3e50; color:#fff; font-size:12px; }
+        .status-card tbody tr { cursor:pointer; }
+        .status-card tbody tr.cur { outline:3px solid var(--accent-color); outline-offset:-3px; }
+        .status-card td.ok { background:#e9f7ef; color:#1e8449; font-weight:700; }
+        .status-card td.no { background:#fdecea; color:#c0392b; font-weight:700; }
     </style>
 </head>
 <body>
@@ -137,6 +149,8 @@
                 </select>
             </div>
 
+            <div class="pending-line" id="pending-line"></div>
+
             <div class="form-group">
                 <label id="lbl-lesson-count">Присутствовало на уроке</label>
                 <input type="number" id="lesson-count" placeholder="30" required min="0">
@@ -145,6 +159,15 @@
 
             <button type="submit" class="btn-submit" id="btn-send">Отправить директору</button>
         </form>
+    </div>
+
+    <div class="card status-card" id="status-card" style="display:none">
+        <h3 id="st-title"></h3>
+        <div class="hint" id="st-hint"></div>
+        <table>
+            <thead id="st-head"></thead>
+            <tbody id="st-body"></tbody>
+        </table>
     </div>
 </div>
 
@@ -178,7 +201,11 @@
             tooMany: "Число присутствующих больше, чем учеников в классе",
             alreadyMsg: "⚠️ Вы уже отправили {n}-урок для класса {c} (присутствовало: {v}). Повторно отправить нельзя. Для исправления обратитесь к директору.",
             allTaken: "✅ Для класса {c} сегодня уже отправлены все уроки (1, 2, 6).",
-            dupAlert: "Этот урок для данного класса уже отправлен. Повторная отправка запрещена."
+            dupAlert: "Этот урок для данного класса уже отправлен. Повторная отправка запрещена.",
+            statusTitle: "📋 Состояние классов сегодня",
+            statusHint: "Нажмите на класс, чтобы выбрать его. ✓ — отправлено, — не отправлено.",
+            notTakenFor: "⏳ Не отправлены за {n}-урок",
+            allDone: "✅ Все классы смены уже отправили {n}-урок."
         },
         kg: {
             appTitle: "Катышууну киргизүү",
@@ -198,7 +225,11 @@
             tooMany: "Катышкандардын саны класстагы окуучулардан көп",
             alreadyMsg: "⚠️ Сиз {c} классынын {n}-сабагын мурун эле жөнөткөнсүз (катышкан: {v}). Кайра жөнөтүүгө болбойт. Оңдоо үчүн директорго кайрылыңыз.",
             allTaken: "✅ {c} классы үчүн бүгүн бардык сабактар (1, 2, 6) жөнөтүлүп бүттү.",
-            dupAlert: "Бул класстын бул сабагы мурун эле жөнөтүлгөн. Кайра жөнөтүүгө тыюу салынат."
+            dupAlert: "Бул класстын бул сабагы мурун эле жөнөтүлгөн. Кайра жөнөтүүгө тыюу салынат.",
+            statusTitle: "📋 Бүгүнкү класстардын абалы",
+            statusHint: "Тандоо үчүн класска басыңыз. ✓ — жөнөтүлдү, — жөнөтүлө элек.",
+            notTakenFor: "⏳ {n}-сабак жөнөтүлө элек",
+            allDone: "✅ Нөөмөттөгү бардык класстар {n}-сабакты жөнөттү."
         }
     };
 
@@ -254,6 +285,57 @@
     }
 
     let autoPick = false;
+
+    const escH = (x) => String(x ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    // Qaysi sinflar yuborilgan / yuborilmagan - o'qituvchi ko'rib turadi
+    function renderStatus() {
+        const t = translations[currentLang];
+        const shift = el('shift-select').value;
+        const lesson = el('lesson-type').value || '1';
+        const current = el('class-select').value;
+        const list = classesData.filter(c => c.shift === shift)
+            .sort((a, b) => String(a.className).localeCompare(String(b.className), undefined, { numeric: true }));
+        const card = el('status-card'), line = el('pending-line');
+
+        if (!list.length) { card.style.display = 'none'; line.style.display = 'none'; return; }
+
+        const get = (c) => attData[shift + '_' + c.className] || {};
+        const pending = list.filter(c => get(c)['l' + lesson] === undefined);
+
+        line.style.display = 'block';
+        if (pending.length) {
+            line.className = 'pending-line';
+            line.innerHTML = `<b>${t.notTakenFor.replace('{n}', lesson)} (${pending.length}/${list.length}):</b><br>` +
+                pending.map(c => `<span class="chip" data-cls="${escH(c.className)}" data-mode="keep">${escH(c.className)}</span>`).join('');
+        } else {
+            line.className = 'pending-line done';
+            line.textContent = t.allDone.replace('{n}', lesson);
+        }
+
+        card.style.display = 'block';
+        el('st-title').textContent = t.statusTitle;
+        el('st-hint').textContent = t.statusHint;
+        const cnt = (n) => list.filter(c => get(c)['l' + n] !== undefined).length;
+        el('st-head').innerHTML = `<tr><th>${t.lblClass}</th>` +
+            LESSONS.map(n => `<th>${n}-${t.lesson}<br>${cnt(n)}/${list.length}</th>`).join('') + '</tr>';
+        el('st-body').innerHTML = list.map(c => {
+            const a = get(c);
+            return `<tr class="${c.className === current ? 'cur' : ''}" data-cls="${escH(c.className)}" data-mode="auto"><td><b>${escH(c.className)}</b></td>` +
+                LESSONS.map(n => a['l' + n] !== undefined ? `<td class="ok">✓ ${a['l' + n]}</td>` : `<td class="no">—</td>`).join('') + '</tr>';
+        }).join('');
+    }
+
+    // Chip yoki qatorga bosilganda sinf tanlanadi
+    document.addEventListener('click', (e) => {
+        const node = e.target.closest('[data-cls]');
+        if (!node) return;
+        const sel = el('class-select');
+        sel.value = node.dataset.cls;
+        autoPick = node.dataset.mode === 'auto';
+        renderLive();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
     const LESSONS = ['1', '2', '6'];
 
     function renderLive() {
@@ -272,6 +354,7 @@
 
         if (!className) {
             box.style.display = 'none'; warn.style.display = 'none'; btn.disabled = false;
+            renderStatus();
             return;
         }
         if (autoPick) {                       // sinf almashganda birinchi bo'sh darsni tanlaydi
@@ -299,6 +382,7 @@
             warn.style.display = 'none';
         }
         btn.disabled = chosenSent;
+        renderStatus();
     }
 
     el('shift-select').addEventListener('change', () => { autoPick = true; fillClassSelect(); });
